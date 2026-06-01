@@ -7,11 +7,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Locale;
+import java.util.Set;
+
 @Service
 public class RegulatoryAnnotationMaintenanceServiceImpl implements RegulatoryAnnotationMaintenanceService {
 
     private static final String DEFAULT_DOMAIN = "integration";
     private static final String SUCCESS_MESSAGE = "Linked region materialized table refreshed successfully.";
+    private static final Set<String> VALID_DOMAINS = Set.of("integration", "rna", "atac");
 
     private final RegulatoryAnnotationMaintenanceMapper regulatoryAnnotationMaintenanceMapper;
     private final RegulatoryAnnotationCountCache countCache;
@@ -59,7 +63,14 @@ public class RegulatoryAnnotationMaintenanceServiceImpl implements RegulatoryAnn
 
     private String normalizeDomain(String domain) {
         String normalized = trimToNull(domain);
-        return normalized == null ? DEFAULT_DOMAIN : normalized;
+        String value = normalized == null ? DEFAULT_DOMAIN : normalized.toLowerCase(Locale.ROOT);
+        if (!VALID_DOMAINS.contains(value)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "domain must be integration, rna, or atac"
+            );
+        }
+        return value;
     }
 
     private String trimToNull(String value) {

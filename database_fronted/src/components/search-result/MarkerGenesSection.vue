@@ -1969,9 +1969,9 @@ watch(() => [props.demoMode, props.demoSize] as const, () => {
   flex-wrap: wrap;
   padding: 12px;
   margin-bottom: 14px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(143, 165, 156, 0.18);
   border-radius: 14px;
-  background: #ffffffc7;
+  background: rgba(255, 255, 255, 0.82);
   transition:
     border-color 0.18s ease,
     box-shadow 0.18s ease,
@@ -1979,7 +1979,7 @@ watch(() => [props.demoMode, props.demoSize] as const, () => {
 }
 
 .query-panel:hover {
-  border-color: var(--border-brand);
+  border-color: rgba(143, 165, 156, 0.34);
   box-shadow: 0 8px 18px rgba(95, 125, 112, 0.12);
   transform: translateY(-1px);
 }
@@ -2006,7 +2006,7 @@ watch(() => [props.demoMode, props.demoSize] as const, () => {
 }
 
 .control-label {
-  color: var(--text);
+  color: rgba(39, 66, 58, 0.84);
   font-size: 12px;
   font-weight: 900;
 }
@@ -2017,26 +2017,37 @@ watch(() => [props.demoMode, props.demoSize] as const, () => {
 
 .control-input :deep(.el-input__wrapper),
 .control-input :deep(.el-select__wrapper) {
-  min-height: 34px;
-  border-radius: 10px;
-  background: var(--surface);
-  box-shadow: 0 0 0 1px var(--border) inset;
+  min-height: 44px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 1px rgba(143, 165, 156, 0.2) inset;
   transition:
     background-color 0.18s ease,
-    box-shadow 0.18s ease;
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
 }
 
 .control-input :deep(.el-input__wrapper:hover),
 .control-input :deep(.el-select__wrapper:hover) {
-  background: var(--surface-2);
-  box-shadow: 0 0 0 1px var(--detail-teal-border) inset;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(143, 165, 156, 0.34) inset,
+    0 5px 14px rgba(95, 125, 112, 0.08);
 }
 
 .control-input :deep(.el-input__wrapper.is-focus),
 .control-input :deep(.el-select__wrapper.is-focused) {
+  background: #ffffff;
   box-shadow:
-    0 0 0 1px var(--detail-teal) inset,
-    0 0 0 3px var(--detail-teal-focus);
+    0 0 0 1px rgba(127, 154, 144, 0.5) inset,
+    0 0 0 3px rgba(143, 165, 156, 0.16);
+}
+
+.control-input :deep(.el-input__inner),
+.control-input :deep(.el-select__placeholder),
+.control-input :deep(.el-select__selected-item) {
+  font-size: 14px;
+  font-weight: 760;
 }
 
 .pending-filter-note {
@@ -2050,8 +2061,40 @@ watch(() => [props.demoMode, props.demoSize] as const, () => {
 
 .section-button,
 .soft-button {
-  min-height: 34px;
-  font-weight: 800;
+  font-weight: 900;
+}
+
+.section-button {
+  align-self: end;
+  min-width: 112px;
+  min-height: 44px;
+  border-radius: 13px;
+  font-size: 14px;
+  line-height: 1;
+  --el-button-bg-color: #8faea3;
+  --el-button-border-color: #8faea3;
+  --el-button-hover-bg-color: #7f9f94;
+  --el-button-hover-border-color: #7f9f94;
+  --el-button-active-bg-color: #6f8f84;
+  --el-button-active-border-color: #6f8f84;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(95, 125, 112, 0.2);
+  transition:
+    transform 0.18s ease,
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.section-button:hover {
+  box-shadow: 0 10px 22px rgba(95, 125, 112, 0.26);
+  transform: translateY(-1px);
+}
+
+.section-button :deep(span) {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .section-button :deep(.el-icon),
@@ -2059,36 +2102,23 @@ watch(() => [props.demoMode, props.demoSize] as const, () => {
   margin-right: 5px;
 }
 
+.soft-button {
+  align-self: end;
+  min-height: 44px;
+  border-radius: 13px;
+  border-color: rgba(143, 165, 156, 0.26);
+  background: rgba(255, 255, 255, 0.9);
+  color: #173f38;
+  box-shadow: 0 5px 14px rgba(15, 23, 42, 0.04);
+}
+
 .annotation-section :deep(.el-button--primary) {
-  --el-button-bg-color: var(--detail-teal);
-  --el-button-border-color: var(--detail-teal);
-  --el-button-hover-bg-color: var(--detail-teal-hover);
-  --el-button-hover-border-color: var(--detail-teal-hover);
-  --el-button-active-bg-color: var(--detail-teal-active);
-  --el-button-active-border-color: var(--detail-teal-active);
-  background: linear-gradient(135deg, var(--brand-primary), var(--detail-teal));
-  border-color: var(--detail-teal);
   box-shadow: 0 8px 18px rgba(95, 125, 112, 0.22);
-  color: var(--surface);
 }
 
 .annotation-section :deep(.el-button--primary:hover) {
   transform: translateY(-1px);
-  background: linear-gradient(135deg, var(--detail-teal-hover), var(--detail-teal-active));
-  border-color: var(--detail-teal-hover);
   box-shadow: 0 10px 22px rgba(95, 125, 112, 0.26);
-}
-
-.soft-button {
-  border-color: var(--border);
-  background: var(--surface);
-  color: var(--text);
-}
-
-.soft-button:hover {
-  border-color: var(--detail-teal-border);
-  background: var(--surface-2);
-  color: var(--detail-teal-active);
 }
 
 .soft-button.is-disabled,

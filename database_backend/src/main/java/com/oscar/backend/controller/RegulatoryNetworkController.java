@@ -1,6 +1,7 @@
 package com.oscar.backend.controller;
 
 import com.oscar.backend.entity.RegulatoryNetworkExpansionResponse;
+import com.oscar.backend.entity.RegulatoryNetworkLinkPageResponse;
 import com.oscar.backend.entity.RegulatoryNetworkResponse;
 import com.oscar.backend.service.RegulatoryNetworkService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -66,6 +67,29 @@ public class RegulatoryNetworkController {
                 minScore,
                 maxDistance,
                 maxNeighbors
+        );
+    }
+
+    @GetMapping("/regulatory-network/links")
+    public RegulatoryNetworkLinkPageResponse getRegulatoryNetworkLinks(
+            @PathVariable String datasetId,
+            @RequestParam String domain,
+            @RequestParam String nodeType,
+            @RequestParam String nodeId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer pageSize,
+            @RequestParam(required = false) Double minScore,
+            @RequestParam(required = false) String groupBy
+    ) {
+        return regulatoryNetworkService.getRegulatoryNetworkLinks(
+                datasetId,
+                domain,
+                nodeType,
+                nodeId,
+                page,
+                pageSize,
+                minScore,
+                groupBy
         );
     }
 }

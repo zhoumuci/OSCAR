@@ -19,6 +19,14 @@ mybatis:
 
 oscar:
   resource-root: ${OSCAR_RESOURCE_ROOT:/data/oscar}
+  rate-limit:
+    window-seconds: ${OSCAR_RATE_LIMIT_WINDOW_SECONDS:60}
+    max-requests-per-window: ${OSCAR_RATE_LIMIT_MAX_REQUESTS:120}
+    abuse-threshold: ${OSCAR_RATE_LIMIT_ABUSE_THRESHOLD:5}
+    abuse-window-seconds: ${OSCAR_RATE_LIMIT_ABUSE_WINDOW_SECONDS:300}
+    ban-duration-seconds: ${OSCAR_RATE_LIMIT_BAN_DURATION_SECONDS:1800}
+  geoip:
+    database-path: ${OSCAR_GEOIP_DB_PATH:/data/oscar/geoip/GeoLite2-City.mmdb}
   bedtools:
     reference-root: ${OSCAR_BEDTOOLS_REFERENCE_ROOT:${oscar.resource-root}/reference}
     sample-track-root: ${OSCAR_BEDTOOLS_SAMPLE_TRACK_ROOT:${oscar.resource-root}/sample_tracks}

@@ -12,6 +12,7 @@ public class RegulatoryAnnotationCountCache {
 
     private static final long TTL_MILLIS = 5L * 60L * 1000L;
     private static final long CLEANUP_INTERVAL_MILLIS = 60L * 1000L;
+    private static final int MAX_CACHE_SIZE = 5_000;
 
     private final ConcurrentHashMap<CountCacheKey, CountCacheValue> cache = new ConcurrentHashMap<>();
     private volatile long lastCleanupMillis = System.currentTimeMillis();
@@ -28,9 +29,37 @@ public class RegulatoryAnnotationCountCache {
         }
 
         long total = loader.getAsLong();
+        ensureCapacity(now);
         cache.put(key, new CountCacheValue(total, now));
         cleanupExpired(now);
         return new CountResult(total, elapsedMillis(startedAt), false);
+    }
+
+    /**
+     * Evict entries when the cache exceeds {@link #MAX_CACHE_SIZE}.
+     * Eviction order: expired first, then oldest-inserted (by cachedAtMillis).
+     */
+    private void ensureCapacity(long now) {
+        int currentSize = cache.size();
+        if (currentSize < MAX_CACHE_SIZE) {
+            return;
+        }
+
+        // Evict all expired entries first.
+        cache.entrySet().removeIf(entry -> now - entry.getValue().cachedAtMillis() > TTL_MILLIS);
+        currentSize = cache.size();
+        if (currentSize < MAX_CACHE_SIZE) {
+            return;
+        }
+
+        // Still over capacity — evict the oldest entries until we're under 80 %.
+        int targetSize = (int) (MAX_CACHE_SIZE * 0.8);
+        cache.entrySet()
+                .stream()
+                .sorted((a, b) -> Long.compare(a.getValue().cachedAtMillis(), b.getValue().cachedAtMillis()))
+                .limit(Math.max(0, currentSize - targetSize))
+                .map(Map.Entry::getKey)
+                .forEach(cache::remove);
     }
 
     public void clear(String annotationType, String datasetId, String dataDomain) {

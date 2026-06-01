@@ -232,10 +232,11 @@
   </template>
   
   <script setup lang="ts">
-  import { ref } from "vue";
+  import { onMounted, ref } from "vue";
   import { ElMessage } from "element-plus";
   import StatsBarCharts from "@/components/StatsBarCharts.vue";
   import VisitorsMap from "@/components/VisitorsMap.vue";
+  import { fetchVisitorPoints, type VisitorPoint } from "@/api/home";
   
   // ✅ 你后面把真实截图放到 src/assets/slides/ 下面，再把 import 打开
   // import slide1 from "@/assets/slides/slide1.png";
@@ -295,13 +296,25 @@ const copyCite = async () => {
 };
 
 
-// 演示用访客点：后续你可接入真实访客国家/城市 -> 经纬度
-const visitorPoints = [
-  { lat: 1.29, lon: 103.85, value: 2 },   // Singapore
-  { lat: 39.90, lon: 116.40, value: 3 },  // Beijing
-  { lat: 34.05, lon: -118.24, value: 2 }, // LA
-  { lat: 51.50, lon: -0.12, value: 1 },   // London
+const FALLBACK_VISITOR_POINTS: VisitorPoint[] = [
+  { name: "Singapore", lat: 1.29, lon: 103.85, value: 2 },
+  { name: "Beijing", lat: 39.90, lon: 116.40, value: 3 },
+  { name: "Los Angeles", lat: 34.05, lon: -118.24, value: 2 },
+  { name: "London", lat: 51.50, lon: -0.12, value: 1 },
 ];
+
+const visitorPoints = ref<VisitorPoint[]>(FALLBACK_VISITOR_POINTS);
+
+onMounted(async () => {
+  try {
+    const points = await fetchVisitorPoints();
+    if (points && points.length > 0) {
+      visitorPoints.value = points;
+    }
+  } catch {
+    // Keep fallback data if the API is unreachable.
+  }
+});
   </script>
   
   <style scoped>
@@ -668,10 +681,17 @@ const visitorPoints = [
   .contact-note{ margin-top: 12px; font-size: 12px; color: var(--muted); line-height:1.6; }
   .contact-right{
     border-radius: 16px;
+    min-width: 0;
+    overflow: hidden;
   }
-  
+
   @media (max-width: 980px){
     .proj-grid{ grid-template-columns: 1fr; }
     .contact-grid{ grid-template-columns: 1fr; }
+    .contact-right {
+      min-width: 0;
+      overflow: hidden;
+      max-width: 100%;
+    }
   }
   </style>

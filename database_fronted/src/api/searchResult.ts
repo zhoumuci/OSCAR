@@ -123,14 +123,6 @@ export interface MarkerGenesResponse {
   size: number;
 }
 
-export interface MarkerGenesQuery {
-  datasetId: string;
-  domain: SearchResultDomain;
-  groupBy: MarkerGeneGroupBy;
-  query?: string;
-  page?: number;
-  size?: number;
-}
 
 export interface RegulatoryAnnotationRecord {
   id: string;
@@ -422,27 +414,6 @@ export interface RegulatoryNetworkLinksResponse {
   page: number;
   pageSize: number;
   items: RegulatoryNetworkLink[];
-}
-
-export interface RegulatoryLinksQuery {
-  datasetId: string;
-  domain: SearchResultDomain;
-  mode: RegulatoryNetworkMode;
-  gene?: string;
-  peak?: string;
-  groupBy?: MarkerGeneGroupBy;
-  minScore?: number;
-  maxDistance?: number;
-  visibleOnly?: boolean;
-  page?: number;
-  size?: number;
-}
-
-export interface RegulatoryLinksResponse {
-  records: RegulatoryNetworkLink[];
-  total: number;
-  page: number;
-  size: number;
 }
 
 export interface BedtoolsSourceOption {
@@ -1034,31 +1005,6 @@ export async function fetchUmap({
   return unwrapSearchResultResponse(data, "GET /api/search-result/umap");
 }
 
-export async function fetchMarkerGenes({
-  datasetId,
-  domain,
-  groupBy,
-  query,
-  page = 1,
-  size = 10,
-}: MarkerGenesQuery): Promise<MarkerGenesResponse> {
-  // TODO: Backend should implement GET /api/samples/{datasetId}/marker-genes.
-  const { data } = await axios.get<MarkerGenesResponse | BackendEnvelope<MarkerGenesResponse>>(
-    buildApiUrl(samplePath(datasetId, "marker-genes")),
-    {
-      params: {
-        domain,
-        groupBy,
-        query: query?.trim() || undefined,
-        page,
-        size,
-      },
-    }
-  );
-
-  return unwrapSearchResultResponse(data, "GET /api/samples/{datasetId}/marker-genes");
-}
-
 export async function fetchRegulatoryAnnotations({
   datasetId,
   domain,
@@ -1231,41 +1177,6 @@ export async function fetchRegulatoryNetworkLinks({
 
   const payload = unwrapSearchResultResponse(data, "GET /api/samples/{datasetId}/regulatory-network/links");
   return normalizeRegulatoryNetworkLinksResponse(payload, page, pageSize);
-}
-
-export async function fetchRegulatoryLinks({
-  datasetId,
-  domain,
-  mode,
-  gene,
-  peak,
-  groupBy,
-  minScore,
-  maxDistance,
-  visibleOnly,
-  page = 1,
-  size = 20,
-}: RegulatoryLinksQuery): Promise<RegulatoryLinksResponse> {
-  // TODO: Backend should implement GET /api/samples/{datasetId}/regulatory-links.
-  const { data } = await axios.get<RegulatoryLinksResponse | BackendEnvelope<RegulatoryLinksResponse>>(
-    buildApiUrl(samplePath(datasetId, "regulatory-links")),
-    {
-      params: {
-        domain,
-        mode,
-        gene: gene?.trim() || undefined,
-        peak: peak?.trim() || undefined,
-        groupBy,
-        minScore,
-        maxDistance,
-        visibleOnly,
-        page,
-        size,
-      },
-    }
-  );
-
-  return unwrapSearchResultResponse(data, "GET /api/samples/{datasetId}/regulatory-links");
 }
 
 export async function fetchBedtoolsSources({

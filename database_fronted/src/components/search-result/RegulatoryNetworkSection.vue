@@ -156,7 +156,7 @@
       </div>
     </div>
 
-    <el-skeleton v-if="loading" animated :rows="8" />
+    <el-skeleton v-if="loading && !hasGraphData" animated :rows="8" />
 
     <div v-else-if="error" class="state-message state-message--error">
       Regulatory network request failed. Please retry.
@@ -220,21 +220,21 @@
                     {{ selectedDetail.chip }}
                   </span>
                 </div>
+                <el-button
+                  v-if="fullLinksAction"
+                  class="inspector-full-links-button"
+                  :class="{ active: fullLinksDialogVisible }"
+                  size="small"
+                  plain
+                  :loading="fullLinksLoading && fullLinksDialogVisible"
+                  @click="openFullLinksDialog"
+                >
+                  {{ fullLinksAction.label }}
+                </el-button>
                 <button class="inspector-close" type="button" aria-label="Clear detail" @click="clearSelection">
                   x
                 </button>
               </div>
-              <el-button
-                v-if="fullLinksAction"
-                class="inspector-full-links-button"
-                :class="{ active: fullLinksDialogVisible }"
-                size="small"
-                plain
-                :loading="fullLinksLoading && fullLinksDialogVisible"
-                @click="openFullLinksDialog"
-              >
-                {{ fullLinksAction.label }}
-              </el-button>
 
               <div class="inspector-details-scroll">
                 <div
@@ -464,6 +464,14 @@
       </div>
     </el-dialog>
   </section>
+
+  <Teleport to="body">
+    <Transition name="peak-toast-slide">
+      <div v-if="peakHintVisible" class="peak-format-toast">
+        Use <b>chr:start-end</b> format, e.g. <b>chr1:10000-20000</b>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -795,11 +803,25 @@ async function resetNetwork() {
   await loadNetwork("default");
 }
 
+const peakHintVisible = ref(false);
+let peakHintTimer: ReturnType<typeof setTimeout> | undefined;
+const PEAK_REGION_PATTERN = /^chr[\w]+:\d[\d,]*-(\d[\d,]*)$/i;
+
 async function searchNetwork() {
   clearSelection();
   exhaustedNodeIds.value = new Set();
   autoExpandedNodeIds.value = new Set();
   focusedNodeId.value = "";
+
+  if (queryMode.value === "peak") {
+    const peak = peakQuery.value.trim();
+    if (peak && !PEAK_REGION_PATTERN.test(peak)) {
+      clearTimeout(peakHintTimer);
+      peakHintVisible.value = true;
+      peakHintTimer = setTimeout(() => { peakHintVisible.value = false; }, 2500);
+      return;
+    }
+  }
 
   const intent: QueryIntent = queryMode.value === "gene" && geneQuery.value.trim()
     ? "gene"
@@ -916,7 +938,8 @@ function getIntentAnchorNode(intent: QueryIntent): GraphNode | null {
 function getIntentAnchorNodeFromGraph(sourceGraph: RegulatoryGraph, intent: QueryIntent): GraphNode | null {
   const anchor = getQueryAnchorDefinition(intent);
   if (!anchor) return null;
-  return sourceGraph.nodes.find((node) => node.id === anchor.id) ?? null;
+  const targetId = anchor.id.toLowerCase();
+  return sourceGraph.nodes.find((node) => node.id.toLowerCase() === targetId) ?? null;
 }
 
 function getQueryAnchorDefinition(intent: QueryIntent): Pick<GraphNode, "id" | "type" | "label"> | null {
@@ -2300,6 +2323,43 @@ defineExpose({
   font-weight: 900;
 }
 
+.peak-format-toast {
+  position: fixed;
+  left: 24px;
+  top: 16%;
+  transform: translateY(-50%);
+  z-index: 3000;
+  max-width: 340px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(143, 174, 163, 0.36);
+  box-shadow: 0 8px 28px rgba(50, 102, 91, 0.14);
+  color: #173f38;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+.peak-format-toast b {
+  color: #32665b;
+  font-weight: 950;
+}
+
+.peak-toast-slide-enter-active {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+.peak-toast-slide-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.peak-toast-slide-enter-from {
+  opacity: 0;
+  transform: translateY(-50%) translateX(-24px);
+}
+.peak-toast-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-50%) translateX(-12px);
+}
+
 .control-input {
   width: 100%;
 }
@@ -2835,10 +2895,7 @@ defineExpose({
 }
 
 .inspector-full-links-button {
-  position: absolute;
-  top: 16px;
-  right: 52px;
-  z-index: 3;
+  flex: 0 0 auto;
   max-width: 178px;
   min-height: 28px;
   border-color: rgba(143, 165, 156, 0.22);
@@ -3200,7 +3257,6 @@ defineExpose({
   }
 
   .inspector-full-links-button {
-    position: static;
     align-self: flex-start;
     max-width: 100%;
     margin-bottom: 10px;

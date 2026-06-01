@@ -69,7 +69,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
         String normalizedDatasetId = normalizeRequired(datasetId, "datasetId");
         String normalizedDomain = normalizeDomain(domain);
         String normalizedMode = normalizeMode(mode);
-        String normalizedGene = trimToNull(gene);
+        String normalizedGene = normalizeGeneSymbol(gene);
         String normalizedPeak = trimToNull(peak);
         String normalizedGroupBy = normalizeGroupBy(groupBy);
         Double normalizedMinScore = normalizeMinScore(minScore);
@@ -918,6 +918,11 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
     private String stripNodePrefix(String nodeId, String nodeType) {
         String prefix = nodeType + ":";
         return nodeId.startsWith(prefix) ? nodeId.substring(prefix.length()) : nodeId;
+    }
+
+    private String normalizeGeneSymbol(String value) {
+        String trimmed = trimToNull(value);
+        return trimmed == null ? null : trimmed.toUpperCase(Locale.ROOT);
     }
 
     private String trimToNull(String value) {

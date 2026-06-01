@@ -1026,23 +1026,24 @@ function animateNodePositions(graph: RegulatoryGraph) {
   if (nodeAnimationFrame !== undefined) window.cancelAnimationFrame(nodeAnimationFrame);
 
   const previousNodes = new Map(animatedNodes.value.map((node) => [node.id, node] as const));
-  animatedNodes.value = graph.nodes.map((node) => {
-    const previousNode = previousNodes.get(node.id);
-    const origin = props.enteringNodeOrigins?.[node.id];
-    const start = previousNode
-      ? { x: previousNode.x, y: previousNode.y }
-      : origin ?? { x: node.x, y: node.y };
+  const isSameGraph = graph.nodes.length === animatedNodes.value.length
+    && graph.nodes.every((n) => previousNodes.has(n.id));
 
-    return {
-      ...cloneNode(node),
-      x: start.x,
-      y: start.y,
-    };
-  });
-
-  nodeAnimationFrame = window.requestAnimationFrame(() => {
-    animatedNodes.value = graph.nodes.map(cloneNode);
-  });
+  if (isSameGraph) {
+    // Same node set (e.g., expansion / pan change) — smooth positional animation.
+    animatedNodes.value = graph.nodes.map((node) => {
+      const prev = previousNodes.get(node.id)!;
+      return { ...cloneNode(node), x: prev.x, y: prev.y };
+    });
+    nodeAnimationFrame = window.requestAnimationFrame(() => {
+      animatedNodes.value = graph.nodes.map(cloneNode);
+    });
+  } else {
+    // Different node set (e.g., new search) — instant swap, no animation.
+    nodeAnimationFrame = window.requestAnimationFrame(() => {
+      animatedNodes.value = graph.nodes.map(cloneNode);
+    });
+  }
 }
 
 function cloneNode(node: GraphNode): GraphNode {
