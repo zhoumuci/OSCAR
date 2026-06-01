@@ -1109,6 +1109,9 @@ function cloneNode(node: GraphNode): GraphNode {
 }
 
 .network-svg {
+  --enter-x: 0px;
+  --enter-y: 0px;
+  --enter-delay: 0ms;
   position: relative;
   z-index: 1;
   display: block;
