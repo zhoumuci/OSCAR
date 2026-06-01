@@ -1,0 +1,116 @@
+.oscar-pill-select {
+  width: 100%;
+}
+
+.oscar-pill-select .el-select__wrapper {
+  min-height: 28px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border) inset;
+  padding: 0 9px 0 10px;
+  transition:
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.oscar-pill-select .el-select__wrapper:hover {
+  background: var(--surface-2);
+  box-shadow: 0 0 0 1px var(--border-brand) inset;
+}
+
+.oscar-pill-select .el-select__wrapper.is-focused {
+  box-shadow:
+    0 0 0 1px var(--nav-active-border) inset,
+    0 5px 12px rgba(95, 125, 112, 0.16);
+}
+
+.oscar-pill-select .el-select__selected-item {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.oscar-pill-select .el-select__caret {
+  color: var(--muted);
+}
+
+.oscar-pagination .el-pagination__sizes .el-select {
+  width: 104px;
+}
+
+.oscar-pagination .el-pagination__sizes .el-select__wrapper {
+  min-height: 28px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border) inset;
+  padding: 0 9px 0 10px;
+  transition:
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.oscar-pagination .el-pagination__sizes .el-select__wrapper:hover {
+  background: var(--surface-2);
+  box-shadow: 0 0 0 1px var(--border-brand) inset;
+}
+
+.oscar-pagination .el-pagination__sizes .el-select__wrapper.is-focused {
+  box-shadow:
+    0 0 0 1px var(--nav-active-border) inset,
+    0 5px 12px rgba(95, 125, 112, 0.16);
+}
+
+.oscar-pagination .el-pagination__sizes .el-select__selected-item {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.oscar-pagination .el-pagination__sizes .el-select__caret {
+  color: var(--muted);
+}
+
+.oscar-select-popper {
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  background: #fffffff2 !important;
+  box-shadow:
+    0 16px 32px rgba(18, 24, 38, 0.14),
+    inset 0 1px 0 #ffffffcc !important;
+  overflow: hidden;
+}
+
+.oscar-select-popper .el-popper__arrow::before {
+  border-color: var(--border) !important;
+  background: #fffffff2 !important;
+}
+
+.oscar-select-popper .el-select-dropdown {
+  border-radius: 12px;
+  background: transparent;
+}
+
+.oscar-select-popper .el-select-dropdown__list {
+  padding: 6px;
+}
+
+.oscar-select-popper .el-select-dropdown__item {
+  height: 32px;
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 32px;
+  padding: 0 12px;
+}
+
+.oscar-select-popper .el-select-dropdown__item.hover,
+.oscar-select-popper .el-select-dropdown__item:hover {
+  background: var(--surface-3) !important;
+  color: var(--text) !important;
+}
+
+.oscar-select-popper .el-select-dropdown__item.is-selected {
+  background: var(--nav-active-bg) !important;
+  color: var(--nav-active-text) !important;
+}

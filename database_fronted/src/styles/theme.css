@@ -1,0 +1,82 @@
+:root{
+    /* ===== Brand: 主色（你给的色卡） ===== */
+    --brand-primary:   #A6BAB1;  /* ling lü */
+    --brand-primary-2: #C6D4CE;  /* 更浅一档（hover/浅底） */
+    --brand-primary-3: #8FA59C;  /* 更深一档（强调/边框） */
+  
+    /* 深墨（文字） */
+    --brand-ink: #1B2A27;
+  
+    /* ===== Page / Surface ===== */
+    --bg:        #FBFCFB;        /* 页面背景：干净白 */
+    --surface:   #FFFFFF;        /* 卡片底 */
+    --surface-2: #F4F7F6;        /* 内层浅底（淡玉白灰） */
+    --surface-3: #E9EFED;        /* hover/active 的更深浅底 */
+  
+    /* ===== Text ===== */
+    --text:  #1B2A27;
+    --muted: #5E6C67;
+  
+    /* ===== Navigation（不要太突出：只比背景略深一点） ===== */
+    --nav-bg:            #8FA59C;  /* 轻微加深的玉白（和背景明显区分但不抢） */
+    --nav-text:          var(--text);
+    --nav-border:        #1B2A2733; /* 10% alpha 的墨色边（8位hex） */
+  
+    --nav-item-text:     var(--nav-text);
+    --nav-hover-bg:      #C6D4CE;
+  
+    --nav-active-bg:     #C6D4CE;  /* active 再深一点点 */
+    --nav-active-text:   var(--text);
+    --nav-active-border: #8FA59C99;
+  
+    --nav-icon:          var(--text);
+  
+    /* ===== Border & Shadow（尽量不用 rgba，用 8 位 hex） ===== */
+    --border:        #1B2A2724;  /* 10% */
+    --border-strong: #1B2A2733;  /* 16% */
+    --border-brand:  #8FA59C66;  /* 40% */
+  
+    --shadow-card:   0 8px 18px #12182614; /* 10% */
+    --shadow-hover:  0 10px 24px #1218261F; /* 14% */
+  
+    /* ===== HomeView 里会用到的额外 token（避免组件里写 rgba/hex） ===== */
+    --ink-soft:  #1B2A27B8;      /* 72% */
+    --text-soft: #1B2A27B3;      /* 70% */
+    --divider:   var(--border);
+    --carousel-bg: var(--surface);
+    --figure-body-bg: var(--surface-2);
+    --meta-text: var(--brand-primary-3);
+  
+    /* 图表（同系） */
+    --chart-human: var(--brand-primary-3);
+    --chart-mouse: #7F9A90;
+  
+    /* Radius / layout */
+    --radius-lg: 18px;
+    --radius-md: 14px;
+    --page-max: 1600px;
+
+    --map-bg: var(--surface-2);
+    --map-land: var(--surface);         /* 陆地填充（白） */
+    --map-border: var(--border);        /* 国界线 */
+    --map-land-hover: var(--surface-3); /* hover 时陆地略深 */
+    --map-dot: var(--brand-primary-3);  /* 点（深翠涛） */
+    --map-ripple: var(--brand-primary); /* 波纹（主翠涛） */
+  }
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", "Liberation Sans", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+a { color: inherit; text-decoration: none; }
+.container {
+  width: min(var(--page-max), calc(100% - 32px));
+  margin: 0 auto;
+}
