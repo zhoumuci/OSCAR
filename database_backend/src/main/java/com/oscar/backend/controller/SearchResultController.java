@@ -9,11 +9,15 @@ import com.oscar.backend.entity.RegulatoryTfSummaryResponse;
 import com.oscar.backend.service.RegulatoryNetworkService;
 import com.oscar.backend.service.RegulatoryAnnotationService;
 import com.oscar.backend.service.SearchResultService;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/search-result")
@@ -62,10 +66,36 @@ public class SearchResultController {
             @RequestParam String datasetId,
             @RequestParam(required = false) String domain,
             @RequestParam(required = false) String embedding,
-            @RequestParam(required = false, defaultValue = "celltype") String colorBy,
+            @RequestParam(required = false) String colorBy,
             @RequestParam(required = false) Integer maxPoints
     ) {
         return searchResultService.getUmap(datasetId, domain, embedding, colorBy, maxPoints);
+    }
+
+    @GetMapping(value = "/umap/download", produces = "text/csv")
+    public void downloadFullUmap(
+            @RequestParam String datasetId,
+            @RequestParam(required = false) String domain,
+            @RequestParam(required = false) String embedding,
+            @RequestParam(required = false) String colorBy,
+            HttpServletResponse response
+    ) throws IOException {
+        String domainPart = downloadPart(domain, "integration").toLowerCase();
+        String colorFallback = "integration".equals(domainPart) ? "celltype" : "cluster";
+        String filename = downloadPart(datasetId, "sample")
+                + "_" + domainPart
+                + "_" + downloadPart(embedding, "umap").toLowerCase()
+                + "_" + downloadPart(colorBy, colorFallback).toLowerCase()
+                + "_full.csv";
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType("text/csv; charset=UTF-8");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
+        searchResultService.writeFullUmapCsv(datasetId, domain, embedding, colorBy, response.getOutputStream());
+    }
+
+    private String downloadPart(String value, String fallback) {
+        String candidate = value == null || value.isBlank() ? fallback : value.trim();
+        return candidate.replaceAll("[^A-Za-z0-9._-]+", "_");
     }
 
     @GetMapping("/regulatory-network/links")
@@ -76,8 +106,9 @@ public class SearchResultController {
             @RequestParam String nodeId,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer pageSize,
-            @RequestParam(required = false) Double minScore,
-            @RequestParam(required = false) String groupBy
+            @RequestParam(required = false) String gene,
+            @RequestParam(required = false) String peak,
+            @RequestParam(required = false) Double minScore
     ) {
         return regulatoryNetworkService.getRegulatoryNetworkLinks(
                 datasetId,
@@ -86,8 +117,9 @@ public class SearchResultController {
                 nodeId,
                 page,
                 pageSize,
-                minScore,
-                groupBy
+                gene,
+                peak,
+                minScore
         );
     }
 

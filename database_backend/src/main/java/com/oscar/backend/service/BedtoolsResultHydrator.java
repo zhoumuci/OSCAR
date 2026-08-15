@@ -71,6 +71,7 @@ public class BedtoolsResultHydrator {
         record.setAnnotationLabel(type == null ? raw.getAnnotationType() : type.recordLabel());
         record.setScope(raw.getScope());
         record.setFeatureId(raw.getFeatureId());
+        record.setQueryRegion(raw.getQueryRegion());
         record.setFeatureRegion(regionString(raw.getFeatureChrom(), raw.getFeatureStart(), raw.getFeatureEnd()));
         record.setOverlapBp(raw.getOverlapBp());
         record.setOverlapRatioQuery(raw.getOverlapRatioQuery());
@@ -174,7 +175,12 @@ public class BedtoolsResultHydrator {
                 || type == BedtoolsAnnotationType.ENHANCER
                 || type == BedtoolsAnnotationType.SUPER_ENHANCER
                 || type == BedtoolsAnnotationType.METHYLATION
-                || type == BedtoolsAnnotationType.CRISPR;
+                || type == BedtoolsAnnotationType.CRISPR
+                || type == BedtoolsAnnotationType.ATAC_PEAKS
+                || type == BedtoolsAnnotationType.GENOMIC_3D
+                || type == BedtoolsAnnotationType.DNASE_PEAKS
+                || type == BedtoolsAnnotationType.TAD
+                || type == BedtoolsAnnotationType.ERNA;
     }
 
     private void hydrateRegulatoryReference(
@@ -236,7 +242,9 @@ public class BedtoolsResultHydrator {
         if (normalizedChromosome == null || start == null || end == null) {
             return null;
         }
-        return normalizedChromosome + ":" + start + "-" + end;
+        long s = start, e = end;
+        if (s > e) { long t = s; s = e; e = t; }
+        return normalizedChromosome + ":" + s + "-" + e;
     }
 
     private String cellCluster(String cellType, String cluster) {

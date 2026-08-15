@@ -22,6 +22,8 @@ public class BedtoolsOverlapRecord {
     private String evidence;
     private String sample;
     private String name;
+    private String queryRegion;
+    private String queryEnhancerRegion;
     private List<String> rawFields;
 
     public String getAnnotationType() {
@@ -166,6 +168,22 @@ public class BedtoolsOverlapRecord {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getQueryRegion() {
+        return queryRegion;
+    }
+
+    public void setQueryRegion(String queryRegion) {
+        this.queryRegion = queryRegion;
+    }
+
+    public String getQueryEnhancerRegion() {
+        return queryEnhancerRegion;
+    }
+
+    public void setQueryEnhancerRegion(String queryEnhancerRegion) {
+        this.queryEnhancerRegion = queryEnhancerRegion;
     }
 
     public List<String> getRawFields() {

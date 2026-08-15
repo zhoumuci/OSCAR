@@ -18,7 +18,14 @@ public enum BedtoolsAnnotationType {
     ENHANCER("enhancer", "Enhancer", "Enhancers", "reference"),
     SUPER_ENHANCER("super_enhancer", "Super Enhancer", "Super Enhancers", "reference"),
     METHYLATION("methylation", "Methylation", "Methylation", "reference"),
-    CRISPR("crispr", "CRISPR", "CRISPR", "reference");
+    CRISPR("crispr", "CRISPR", "CRISPR", "reference"),
+    ATAC_PEAKS("atac_peaks", "ATAC", "ATAC", "reference"),
+    GENOMIC_3D("3d_interactions", "3D_interactions", "3D_interactions", "reference"),
+    DNASE_PEAKS("dnase_peaks", "Dnase_peaks", "Dnase_peaks", "reference"),
+    TAD("tad", "TAD", "TAD", "reference"),
+    ERNA("erna", "ERNA", "ERNA", "reference"),
+    TF_CHIP_SEQ("tf_chip_seq", "TF-Chip-Seq", "TF-Chip-Seq", "reference"),
+    TCOF("tcof", "T(co)F", "T(co)F", "reference");
 
     private final String value;
     private final String recordLabel;

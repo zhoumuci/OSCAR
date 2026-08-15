@@ -5,7 +5,6 @@ export type SearchResultColorBy = "celltype" | "cluster";
 export type SearchResultEmbedding = "umap" | "tsne";
 export type SearchResultGroupBy = SearchResultColorBy;
 export type SearchResultDomain = "integration" | "rna" | "atac";
-export type MarkerGeneGroupBy = "cell_type" | "cluster";
 export type RegulatoryAnnotationType = "marker_gene" | "marker_peak" | "linked_region";
 export type RegulatoryAnnotationRegionType =
   | "all"
@@ -14,7 +13,7 @@ export type RegulatoryAnnotationRegionType =
   | "linked_peak"
   | "super_enhancer";
 export type RegulatoryNetworkMode = "gene" | "peak";
-export type RegulatoryNetworkNodeType = "gene" | "peak" | "group" | "tf";
+export type RegulatoryNetworkNodeType = "gene" | "peak";
 export type RegulatoryFeatureType = "gene" | "peak";
 export type BedtoolsAnnotationType =
   | "marker_peak"
@@ -23,8 +22,21 @@ export type BedtoolsAnnotationType =
   | "transcript"
   | "tss_promoter"
   | "tf_annotation"
+  | "common_snp"
+  | "risk_snp"
+  | "gtex_eqtl"
+  | "tfbs"
+  | "enhancer"
+  | "super_enhancer"
   | "methylation"
-  | "crispr";
+  | "crispr"
+  | "atac_peaks"
+  | "3d_interactions"
+  | "dnase_peaks"
+  | "tad"
+  | "erna"
+  | "tf_chip_seq"
+  | "tcof";
 export type BedtoolsSourceScope = "sample" | "reference" | "future" | string;
 
 export interface SearchResultOverviewData {
@@ -159,6 +171,9 @@ export interface RegulatoryAnnotationRecord {
   linkScore?: number;
   correlation?: number;
   linkFdr?: number;
+  varQrna?: number;
+  varQatac?: number;
+  signalType?: string;
   distance?: number;
   regionType?: RegulatoryAnnotationRegionType | string;
   regulatoryRegion?: string;
@@ -203,6 +218,11 @@ export interface RegulatoryAnnotationQuery {
   contextCluster?: string;
   maxFdr?: number;
   minLog2fc?: number;
+  minP2gScore?: number;
+  signalType?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  p2gMode?: "marker" | "all";
 }
 
 export interface RegulatoryTfSummaryQuery {
@@ -251,15 +271,9 @@ export interface RegulatoryNetworkNode {
   sampleName?: string;
   sample_name?: string;
   domain?: string;
-  markerStatus?: string;
-  group?: string;
   chromosome?: string;
   start?: number;
   end?: number;
-  markerScore?: number | null;
-  markerRank?: number | null;
-  cellCount?: number | null;
-  proportion?: number | null;
   fdr?: number | null;
   varQAtac?: number | null;
   varQRna?: number | null;
@@ -313,8 +327,6 @@ export interface RegulatoryNetworkLink {
   sampleName?: string;
   sample_name?: string;
   domain?: string;
-  group?: string;
-  markerStatus?: string;
   distanceToTss?: number | null;
   linkScore?: number | null;
   score?: number | null;
@@ -324,8 +336,6 @@ export interface RegulatoryNetworkLink {
   varQRna?: number | null;
   peakId?: string;
   geneSymbol?: string;
-  cellTypeGroup?: string;
-  clusterGroup?: string;
   linkType?: string;
   source?: string;
   linkedGenesCount?: number | null;
@@ -375,9 +385,7 @@ export interface RegulatoryNetworkQuery {
   mode: RegulatoryNetworkMode;
   gene?: string;
   peak?: string;
-  groupBy?: MarkerGeneGroupBy;
   minScore?: number;
-  maxDistance?: number;
   maxNodes?: number;
   maxEdges?: number;
 }
@@ -387,9 +395,9 @@ export interface RegulatoryNetworkExpandQuery {
   domain: SearchResultDomain;
   nodeId: string;
   nodeType: RegulatoryNetworkNodeType;
-  groupBy?: MarkerGeneGroupBy;
+  gene?: string;
+  peak?: string;
   minScore?: number;
-  maxDistance?: number;
   maxNeighbors?: number;
 }
 
@@ -404,9 +412,9 @@ export interface RegulatoryNetworkLinksQuery {
   nodeId: string;
   page?: number;
   pageSize?: number;
-  groupBy?: MarkerGeneGroupBy;
+  gene?: string;
+  peak?: string;
   minScore?: number;
-  maxDistance?: number;
 }
 
 export interface RegulatoryNetworkLinksResponse {
@@ -484,6 +492,8 @@ export interface BedtoolsOverlapRecord {
   score?: number | string | null;
   evidence?: string;
   sample?: string;
+  queryRegion?: string;
+  queryEnhancerRegion?: string;
   [key: string]: unknown;
 }
 
@@ -590,7 +600,7 @@ interface BackendEnvelope<T> {
   data?: T;
 }
 
-const DEFAULT_QC_METRICS = ["TSSEnrichment", "FRIP", "NucleosomeRatio", "nFrags"] as const;
+const DEFAULT_QC_METRICS = ["TSSEnrichment", "nFrags", "Gex_nGenes", "Gex_MitoRatio"] as const;
 const DEFAULT_UMAP_MAX_POINTS = 4000;
 
 type CellTypeCompositionQuery = {
@@ -805,10 +815,14 @@ export function normalizeRegulatoryAnnotationRecord(
   ]);
   const geneChromosome = firstString(raw, ["geneChromosome", "gene_chromosome"]) ||
     (isPromoterRegion ? legacyChromosome : undefined);
-  const geneStart = firstNumber(raw, ["geneStart", "gene_start"]) ||
+  let geneStart = firstNumber(raw, ["geneStart", "gene_start"]) ||
     (isPromoterRegion ? legacyStart : undefined);
-  const geneEnd = firstNumber(raw, ["geneEnd", "gene_end"]) ||
+  let geneEnd = firstNumber(raw, ["geneEnd", "gene_end"]) ||
     (isPromoterRegion ? legacyEnd : undefined);
+  // Normalize: ensure gene start < end regardless of how the DB stored it
+  if (geneStart !== undefined && geneEnd !== undefined && geneStart > geneEnd) {
+    const tmp = geneStart; geneStart = geneEnd; geneEnd = tmp;
+  }
   const geneRegion = firstString(raw, ["geneRegion", "gene_region"]) ||
     coordinateRegion(geneChromosome, geneStart, geneEnd) ||
     (isPromoterRegion ? legacyRegion || legacyCoordinateRegion : undefined);
@@ -816,10 +830,14 @@ export function normalizeRegulatoryAnnotationRecord(
     (isPromoterRegion ? legacyRegion || geneRegion : undefined);
   const peakChromosome = firstString(raw, ["peakChromosome", "peak_chromosome"]) ||
     (!isPromoterRegion ? legacyChromosome : undefined);
-  const peakStart = firstNumber(raw, ["peakStart", "peak_start"]) ||
+  let peakStart = firstNumber(raw, ["peakStart", "peak_start"]) ||
     (!isPromoterRegion ? legacyStart : undefined);
-  const peakEnd = firstNumber(raw, ["peakEnd", "peak_end"]) ||
+  let peakEnd = firstNumber(raw, ["peakEnd", "peak_end"]) ||
     (!isPromoterRegion ? legacyEnd : undefined);
+  // Normalize: ensure peak start < end regardless of how the DB stored it
+  if (peakStart !== undefined && peakEnd !== undefined && peakStart > peakEnd) {
+    const tmp = peakStart; peakStart = peakEnd; peakEnd = tmp;
+  }
   const peakRegion = firstString(raw, ["peakRegion", "peak_region"]) ||
     (!isPromoterRegion ? legacyRegion || legacyCoordinateRegion : undefined);
   const regulatoryRegion = firstString(raw, ["regulatoryRegion", "regulatory_region"]) ||
@@ -886,6 +904,8 @@ export function normalizeRegulatoryAnnotationRecord(
     linkScore: firstNumber(raw, ["linkScore", "link_score", "score"]),
     correlation: firstNumber(raw, ["correlation"]),
     linkFdr: firstNumber(raw, ["linkFdr", "link_fdr"]),
+    varQrna: firstNumber(raw, ["varQrna", "var_qrna", "varQRna"]),
+    varQatac: firstNumber(raw, ["varQatac", "var_qatac", "varQatac"]),
     distance: firstNumber(raw, ["distance", "distanceToTss", "distance_to_tss"]),
     regionType,
     regulatoryRegion,
@@ -909,6 +929,7 @@ export function normalizeRegulatoryAnnotationRecord(
     peak: firstString(raw, ["peak"]),
     peakId: firstString(raw, ["peakId", "peak_id"]),
     gene: firstString(raw, ["gene"]),
+    signalType: firstString(raw, ["signalType", "signal_type"]),
     logFc: firstNumber(raw, ["logFc", "logFC"]),
     log2fc: firstNumber(raw, ["log2fc"]),
     fdr: firstNumber(raw, ["fdr"]),
@@ -1018,6 +1039,11 @@ export async function fetchRegulatoryAnnotations({
   contextCluster,
   maxFdr,
   minLog2fc,
+  minP2gScore,
+  signalType,
+  sortBy,
+  sortOrder,
+  p2gMode,
 }: RegulatoryAnnotationQuery): Promise<RegulatoryAnnotationResponse> {
   const { data } = await axios.get<RegulatoryAnnotationPayload | BackendEnvelope<RegulatoryAnnotationPayload>>(
     buildApiUrl(samplePath(datasetId, "regulatory-annotations")),
@@ -1034,12 +1060,66 @@ export async function fetchRegulatoryAnnotations({
         contextCluster: contextCluster?.trim() || undefined,
         maxFdr,
         minLog2fc,
+        minP2gScore: annotationType === "linked_region" ? minP2gScore : undefined,
+        signalType: annotationType === "marker_gene" ? signalType : undefined,
+        sortBy: sortBy?.trim() || undefined,
+        sortOrder: sortBy ? sortOrder : undefined,
+        p2gMode: annotationType === "linked_region" ? p2gMode : undefined,
       },
     }
   );
 
   const payload = unwrapSearchResultResponse(data, "GET /api/samples/{datasetId}/regulatory-annotations");
   return normalizeRegulatoryAnnotationResponse(payload, page, pageSize, annotationType);
+}
+
+export async function fetchRegulatoryAnnotationsDownload({
+  datasetId,
+  domain,
+  annotationType,
+  targetGene,
+  peak,
+  regionType,
+  contextCellType,
+  contextCluster,
+  maxFdr,
+  minLog2fc,
+  minP2gScore,
+  signalType,
+  sortBy,
+  sortOrder,
+  p2gMode,
+  sampleLabel,
+}: Omit<RegulatoryAnnotationQuery, "page" | "pageSize"> & { sampleLabel?: string }): Promise<{ blob: Blob; filename?: string }> {
+  const response = await axios.get<Blob>(
+    buildApiUrl(samplePath(datasetId, "regulatory-annotations/download.csv")),
+    {
+      responseType: "blob",
+      params: {
+        domain,
+        annotationType,
+        targetGene: targetGene?.trim() || undefined,
+        peak: peak?.trim() || undefined,
+        regionType: annotationType !== "linked_region" && regionType && regionType !== "all" ? regionType : undefined,
+        contextCellType: contextCellType?.trim() || undefined,
+        contextCluster: contextCluster?.trim() || undefined,
+        maxFdr,
+        minLog2fc,
+        minP2gScore: annotationType === "linked_region" ? minP2gScore : undefined,
+        signalType: annotationType === "marker_gene" ? signalType : undefined,
+        sortBy: sortBy?.trim() || undefined,
+        sortOrder: sortBy ? sortOrder : undefined,
+        p2gMode: annotationType === "linked_region" ? p2gMode : undefined,
+        sampleLabel: sampleLabel?.trim() || undefined,
+      },
+    }
+  );
+  const disposition = String(response.headers["content-disposition"] ?? "");
+  const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
+  return {
+    blob: response.data,
+    filename: filenameMatch?.[1],
+  };
 }
 
 export async function fetchRegulatoryAnnotationContextOptions({
@@ -1093,9 +1173,7 @@ export async function fetchRegulatoryNetwork({
   mode,
   gene,
   peak,
-  groupBy,
   minScore,
-  maxDistance,
   maxNodes,
   maxEdges,
 }: RegulatoryNetworkQuery): Promise<RegulatoryNetworkResponse> {
@@ -1108,9 +1186,7 @@ export async function fetchRegulatoryNetwork({
         mode,
         gene: gene?.trim() || undefined,
         peak: peak?.trim() || undefined,
-        groupBy,
         minScore,
-        maxDistance,
         maxNodes,
         maxEdges,
       },
@@ -1125,9 +1201,9 @@ export async function fetchRegulatoryNetworkExpansion({
   domain,
   nodeId,
   nodeType,
-  groupBy,
+  gene,
+  peak,
   minScore,
-  maxDistance,
   maxNeighbors,
 }: RegulatoryNetworkExpandQuery): Promise<RegulatoryNetworkExpansionResponse> {
   // TODO: Backend should implement GET /api/samples/{datasetId}/regulatory-network/expand.
@@ -1138,9 +1214,9 @@ export async function fetchRegulatoryNetworkExpansion({
       domain,
       nodeId,
       nodeType,
-      groupBy,
+      gene: gene?.trim() || undefined,
+      peak: peak?.trim() || undefined,
       minScore,
-      maxDistance,
       maxNeighbors,
     },
   });
@@ -1155,9 +1231,9 @@ export async function fetchRegulatoryNetworkLinks({
   nodeId,
   page = 1,
   pageSize = 20,
-  groupBy,
+  gene,
+  peak,
   minScore,
-  maxDistance,
 }: RegulatoryNetworkLinksQuery): Promise<RegulatoryNetworkLinksResponse> {
   const { data } = await axios.get<RegulatoryNetworkLinksPayload | BackendEnvelope<RegulatoryNetworkLinksPayload>>(
     buildApiUrl(samplePath(datasetId, "regulatory-network/links")),
@@ -1168,9 +1244,9 @@ export async function fetchRegulatoryNetworkLinks({
         nodeId,
         page,
         pageSize,
-        groupBy,
+        gene: gene?.trim() || undefined,
+        peak: peak?.trim() || undefined,
         minScore,
-        maxDistance,
       },
     }
   );
@@ -1201,6 +1277,20 @@ export async function fetchBedtoolsSources({
   return unwrapSearchResultResponse(data, "GET /api/search-result/{datasetId}/regulatory/bedtools/sources");
 }
 
+export async function fetchReferenceSources({
+  genomeBuild = "hg38",
+}: {
+  genomeBuild?: string;
+}): Promise<BedtoolsSourcesResponse> {
+  const { data } = await axios.get<BedtoolsSourcesResponse | BackendEnvelope<BedtoolsSourcesResponse>>(
+    buildApiUrl("api/feature-detail/regulatory/reference-sources"),
+    {
+      params: { genomeBuild },
+    }
+  );
+  return unwrapSearchResultResponse(data, "GET /api/feature-detail/regulatory/reference-sources");
+}
+
 export async function runBedtoolsIntersect({
   datasetId,
   domain,
@@ -1227,6 +1317,83 @@ export async function runBedtoolsIntersect({
   return unwrapSearchResultResponse(data, "POST /api/search-result/{datasetId}/regulatory/bedtools/intersect");
 }
 
+export async function runReferenceIntersect({
+  genomeBuild = "hg38",
+  region,
+  annotationTypes,
+  minOverlapBp = 1,
+  page = 1,
+  pageSize = 10,
+}: {
+  genomeBuild?: string;
+  region: string;
+  annotationTypes: BedtoolsAnnotationType[];
+  minOverlapBp?: number;
+  page?: number;
+  pageSize?: number;
+}): Promise<BedtoolsIntersectResponse> {
+  const { data } = await axios.post<BedtoolsIntersectResponse | BackendEnvelope<BedtoolsIntersectResponse>>(
+    buildApiUrl("api/feature-detail/regulatory/reference-intersect"),
+    {
+      region,
+      annotationTypes,
+      minOverlapBp,
+      page,
+      pageSize,
+    },
+    {
+      params: { genomeBuild },
+    }
+  );
+  return unwrapSearchResultResponse(data, "POST /api/feature-detail/regulatory/reference-intersect");
+}
+
+export type FeatureRegulatoryAnnotationMode =
+  | "gene_body"
+  | "promoter"
+  | "super_enhancer"
+  | "typical_enhancer";
+
+export async function fetchFeatureRegulatoryAnnotation({
+  gene,
+  chrom,
+  start,
+  end,
+  strand,
+  mode,
+  annotationType,
+  domain = "integration",
+  genomeBuild = "hg38",
+}: {
+  gene: string;
+  chrom?: string;
+  start?: number;
+  end?: number;
+  strand?: string;
+  mode: FeatureRegulatoryAnnotationMode;
+  annotationType?: BedtoolsAnnotationType;
+  domain?: SearchResultDomain | string;
+  genomeBuild?: string;
+}): Promise<BedtoolsIntersectResponse> {
+  const { data } = await axios.get<BedtoolsIntersectResponse | BackendEnvelope<BedtoolsIntersectResponse>>(
+    buildApiUrl("api/feature-detail/regulatory/gene-annotation"),
+    {
+      params: {
+        gene,
+        chrom,
+        start,
+        end,
+        strand,
+        mode,
+        annotationType: annotationType || undefined,
+        domain,
+        genomeBuild,
+      },
+    }
+  );
+  return unwrapSearchResultResponse(data, "GET /api/feature-detail/regulatory/gene-annotation");
+}
+
 export interface FeatureOccurrenceTopCellType {
   cellType?: string;
   count?: number;
@@ -1241,6 +1408,7 @@ export interface FeatureOccurrenceDatasetEntry {
 
 export interface DatasetRankingItem {
   datasetId?: string;
+  sampleName?: string;
   recordCount?: number;
   cellContextCount?: number;
   clusterCount?: number;
@@ -1253,10 +1421,23 @@ export interface CellContextRankingItem {
   clusterCount?: number;
 }
 
+export interface GeneEnhancerSummary {
+  enhancerType: string;
+  label: string;
+  matchedRegionCount: number;
+  biosampleCount: number;
+  exampleBiosamples: string[];
+  exampleRegions: string[];
+}
+
 export interface FeatureOccurrenceResponse {
   featureType?: string;
   featureId?: string;
   domain?: string;
+  genomeBuild?: string;
+  geneBodyRegion?: string;
+  promoterRegion?: string;
+  enhancerSummaries?: GeneEnhancerSummary[];
   datasetCount?: number;
   cellTypeCount?: number;
   clusterCount?: number;
@@ -1275,18 +1456,22 @@ export async function fetchFeatureOccurrence({
   chrom,
   start,
   end,
+  strand,
   domain,
+  full,
 }: {
   type: "gene" | "peak";
   gene?: string;
   chrom?: string;
   start?: number;
   end?: number;
+  strand?: string;
   domain?: string;
+  full?: boolean;
 }): Promise<FeatureOccurrenceResponse> {
   const { data } = await axios.get<FeatureOccurrenceResponse>(
     buildApiUrl("/api/feature-detail/occurrence"),
-    { params: { type, gene, chrom, start, end, domain } }
+    { params: { type, gene, chrom, start, end, strand, domain, full: full ? "true" : undefined } }
   );
   return data;
 }

@@ -12,20 +12,12 @@
     >
       <defs>
         <linearGradient id="gene-node-gradient" x1="20%" y1="10%" x2="80%" y2="90%">
-          <stop offset="0%" stop-color="#fff6d7" stop-opacity="0.96" />
-          <stop offset="100%" stop-color="#f2d28a" stop-opacity="0.9" />
+          <stop offset="0%" stop-color="#F59ABB" stop-opacity="0.96" />
+          <stop offset="100%" stop-color="#B11D56" stop-opacity="0.94" />
         </linearGradient>
         <linearGradient id="peak-node-gradient" x1="18%" y1="12%" x2="82%" y2="88%">
-          <stop offset="0%" stop-color="#f8fbff" stop-opacity="0.96" />
-          <stop offset="100%" stop-color="#d8e2ef" stop-opacity="0.9" />
-        </linearGradient>
-        <linearGradient id="group-node-gradient" x1="18%" y1="12%" x2="82%" y2="88%">
-          <stop offset="0%" stop-color="#e9fffa" stop-opacity="0.96" />
-          <stop offset="100%" stop-color="#91ded2" stop-opacity="0.9" />
-        </linearGradient>
-        <linearGradient id="tf-node-gradient" x1="18%" y1="12%" x2="82%" y2="88%">
-          <stop offset="0%" stop-color="#faf7ff" stop-opacity="0.96" />
-          <stop offset="100%" stop-color="#d8cff2" stop-opacity="0.9" />
+          <stop offset="0%" stop-color="#8FD9E5" stop-opacity="0.96" />
+          <stop offset="100%" stop-color="#11A3B8" stop-opacity="0.94" />
         </linearGradient>
         <filter id="node-soft-shadow" x="-60%" y="-60%" width="220%" height="220%">
           <feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#31524d" flood-opacity="0.11" />
@@ -35,7 +27,7 @@
           <feColorMatrix
             in="blur"
             type="matrix"
-            values="0 0 0 0 0.09 0 0 0 0 0.55 0 0 0 0 0.49 0 0 0 0.25 0"
+            values="0 0 0 0 0.561 0 0 0 0 0.851 0 0 0 0 0.898 0 0 0 0.20 0"
           />
           <feMerge>
             <feMergeNode />
@@ -103,7 +95,7 @@
             :key="node.id"
             class="network-node"
             :class="nodeClass(node)"
-            :style="nodeGroupStyle(node)"
+            :style="nodeTransformStyle(node)"
             @click.stop="emit('node-click', node.id)"
             @pointerenter="emit('node-hover', node.id)"
             @pointerleave="emit('node-hover', '')"
@@ -190,6 +182,8 @@ const emit = defineEmits<{
   "node-hover": [nodeId: string];
   "edge-hover": [edgeId: string];
 }>();
+
+defineExpose({ genePeakHex });
 
 type PanStart = {
   pointerId: number;
@@ -371,7 +365,7 @@ function edgePath(edge: GraphEdge): string {
   return `M ${start.x} ${start.y} Q ${controlX} ${controlY} ${end.x} ${end.y}`;
 }
 
-function nodeGroupStyle(node: GraphNode) {
+function nodeTransformStyle(node: GraphNode) {
   return {
     transform: `translate(${node.x}px, ${node.y}px)`,
   };
@@ -385,12 +379,12 @@ function labelStyle(label: SvgLabel) {
 
 function edgeStyle(edge: GraphEdge) {
   const score = normalizedScore(edge);
-  const baseWidth = edge.type === "marker" ? 0.68 : 0.68 + score * 0.96;
-  const width = edge.highlighted ? baseWidth + 0.36 : baseWidth;
-  const opacity = edge.newlyAdded ? undefined : edge.dimmed ? 0.12 : edge.highlighted ? 0.74 : edge.type === "marker" ? 0.16 : 0.16 + score * 0.12;
-  const stroke = edge.type === "marker"
-    ? edge.highlighted ? "rgba(14, 118, 106, 0.52)" : "rgba(22, 140, 124, 0.16)"
-    : edge.highlighted ? `rgba(31, 79, 88, ${0.58 + score * 0.12})` : `rgba(88, 109, 126, ${0.18 + score * 0.12})`;
+  const baseWidth = 1.4 + score * 0.8;
+  const width = edge.highlighted ? baseWidth + 0.4 : baseWidth;
+  const opacity = edge.newlyAdded ? undefined : edge.dimmed ? 0.18 : edge.highlighted ? 0.82 : 0.38 + score * 0.10;
+  const stroke = edge.highlighted
+    ? `rgba(246, 169, 195, ${0.56 + score * 0.12})`
+    : `rgba(158, 223, 234, ${0.36 + score * 0.10})`;
 
   return {
     stroke,
@@ -409,18 +403,40 @@ function nodeVisualStyle(node: GraphNode, index: number) {
   };
 }
 
+function hashId(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) {
+    h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+const GENE_COLORS: string[] = ["#B11D56", "#11A3B8"];
+const PEAK_COLORS: string[] = ["#F59ABB", "#8FD9E5"];
+
+function nodeColor(node: GraphNode): { fill: string; stroke: string } {
+  if (node.type === "gene") {
+    const fill = GENE_COLORS[hashId(node.id) % GENE_COLORS.length]!;
+    return { fill, stroke: fill };
+  }
+  const fill = PEAK_COLORS[hashId(node.id) % PEAK_COLORS.length]!;
+  return { fill, stroke: fill };
+}
+
 function nodeFill(node: GraphNode): string {
-  if (node.type === "gene") return "url(#gene-node-gradient)";
-  if (node.type === "peak") return "url(#peak-node-gradient)";
-  if (node.type === "group") return "url(#group-node-gradient)";
-  return "url(#tf-node-gradient)";
+  return nodeColor(node).fill;
 }
 
 function nodeStroke(node: GraphNode): string {
-  if (node.type === "gene") return "#d49b30";
-  if (node.type === "peak") return "#8fa1b8";
-  if (node.type === "group") return "#159383";
-  return "#8b7ab8";
+  return nodeColor(node).stroke;
+}
+
+/** Exposed so the parent component can derive the color for a given node id. */
+function genePeakHex(nodeId: string): string | null {
+  const node = props.graph.nodes.find(n => n.id === nodeId);
+  if (!node) return null;
+  if (node.type !== "gene" && node.type !== "peak") return null;
+  return nodeColor(node).fill;
 }
 
 function edgeDelay(edge: GraphEdge, index: number) {
@@ -509,7 +525,7 @@ function labelPriority(node: GraphNode): number {
   if (node.id === props.focusedNodeId) return 96;
   const edge = selectedEdge.value ?? hoveredEdge.value;
   if (edge && (edge.source === node.id || edge.target === node.id)) return 92;
-  if (node.type === "gene" || node.type === "group" || node.type === "tf") return 82;
+  if (node.type === "gene") return 82;
   if (node.newlyAdded) return 62;
   if (selectedPeakLabelIds.value.has(node.id) || hoveredPeakLabelIds.value.has(node.id)) return 58;
   return 10;
@@ -528,7 +544,7 @@ function getCenteredLabelBox(node: GraphNode, text: string): LabelBox {
 
 function nodeLayerOrder(node: GraphNode): number {
   if (node.type === "peak") return 0;
-  if (node.type === "gene" || node.type === "tf") return 1;
+  if (node.type === "gene") return 1;
   return 2;
 }
 
@@ -913,7 +929,7 @@ function isActivePeakLabel(node: GraphNode): boolean {
 }
 
 function isCenteredNodeLabel(node: GraphNode): boolean {
-  return node.type === "gene" || node.type === "group" || node.type === "tf";
+  return node.type === "gene";
 }
 
 function hasHoverPreviewContext(): boolean {
@@ -942,13 +958,6 @@ function getRelatedPeakIdsForNode(seedNodeId: string): Set<string> {
     return peakIds;
   }
 
-  if (seedNode.type === "group") {
-    const markerGeneIds = getMarkerGeneIdsForGroup(seedNode.id);
-    markerGeneIds.forEach((geneId) => addDirectPeakNeighbors(peakIds, geneId));
-    addDirectPeakNeighbors(peakIds, seedNode.id);
-    return peakIds;
-  }
-
   addDirectPeakNeighbors(peakIds, seedNode.id);
   return peakIds;
 }
@@ -964,25 +973,11 @@ function getRelatedPeakIdsForEdge(edgeId: string): Set<string> {
   if (!peakIds.size) {
     const sourceNode = nodeById.value.get(edge.source);
     const targetNode = nodeById.value.get(edge.target);
-    if (sourceNode?.type === "gene" || sourceNode?.type === "tf") addDirectPeakNeighbors(peakIds, sourceNode.id);
-    if (targetNode?.type === "gene" || targetNode?.type === "tf") addDirectPeakNeighbors(peakIds, targetNode.id);
-    if (sourceNode?.type === "group") getMarkerGeneIdsForGroup(sourceNode.id).forEach((geneId) => addDirectPeakNeighbors(peakIds, geneId));
-    if (targetNode?.type === "group") getMarkerGeneIdsForGroup(targetNode.id).forEach((geneId) => addDirectPeakNeighbors(peakIds, geneId));
+    if (sourceNode?.type === "gene") addDirectPeakNeighbors(peakIds, sourceNode.id);
+    if (targetNode?.type === "gene") addDirectPeakNeighbors(peakIds, targetNode.id);
   }
 
   return peakIds;
-}
-
-function getMarkerGeneIdsForGroup(groupId: string): Set<string> {
-  const geneIds = new Set<string>();
-  renderEdges.value.forEach((edge) => {
-    if (edge.type !== "marker") return;
-    if (edge.source !== groupId && edge.target !== groupId) return;
-    const otherId = edge.source === groupId ? edge.target : edge.source;
-    const otherNode = nodeById.value.get(otherId);
-    if (otherNode?.type === "gene") geneIds.add(otherNode.id);
-  });
-  return geneIds;
 }
 
 function addDirectPeakNeighbors(peakIds: Set<string>, nodeId: string) {
@@ -1154,10 +1149,6 @@ function cloneNode(node: GraphNode): GraphNode {
     stroke-width 0.22s ease;
 }
 
-.edge-marker {
-  stroke-dasharray: 2.5 7;
-}
-
 .network-edge.is-new {
   animation: edge-grow 620ms ease both;
 }
@@ -1166,11 +1157,6 @@ function cloneNode(node: GraphNode): GraphNode {
   stroke-dasharray: 8 18;
   animation: edge-flow 5.8s linear infinite;
   filter: drop-shadow(0 2px 4px rgba(34, 64, 70, 0.046));
-}
-
-.edge-marker.is-highlighted:not(.is-new) {
-  stroke-dasharray: 3 8;
-  animation-duration: 6.4s;
 }
 
 .network-node {
@@ -1212,19 +1198,11 @@ function cloneNode(node: GraphNode): GraphNode {
 }
 
 .node-gene .node-circle {
-  stroke: #e6a23c;
+  stroke: #B11D56;
 }
 
 .node-peak .node-circle {
-  stroke: #94a3b8;
-}
-
-.node-group .node-circle {
-  stroke: #168c7c;
-}
-
-.node-tf .node-circle {
-  stroke: #8b7ab8;
+  stroke: #F59ABB;
 }
 
 .network-node.is-selected .node-circle,
@@ -1238,12 +1216,12 @@ function cloneNode(node: GraphNode): GraphNode {
 .network-node.is-focused .node-halo {
   opacity: 0.56;
   filter: url("#selected-node-halo");
-  fill: rgba(22, 140, 124, 0.096);
+  fill: rgba(177, 29, 86, 0.08);
   animation: halo-breathe 3.8s ease-in-out infinite;
 }
 
 .network-node.is-focused .node-halo {
-  fill: rgba(82, 142, 180, 0.078);
+  fill: rgba(138, 177, 210, 0.08);
   animation-duration: 4.2s;
 }
 
@@ -1308,24 +1286,14 @@ function cloneNode(node: GraphNode): GraphNode {
 }
 
 .label-gene {
-  fill: #5c4320;
-  font-size: 12px;
-}
-
-.label-group {
-  fill: #07574f;
+  fill: #ffffff;
   font-size: 12px;
 }
 
 .label-peak {
-  fill: rgba(71, 85, 105, 0.78);
+  fill: #6B7A76;
   font-size: 11px;
   font-weight: 610;
-}
-
-.label-tf {
-  fill: #5f5384;
-  font-size: 12px;
 }
 
 .label-centered .node-label {

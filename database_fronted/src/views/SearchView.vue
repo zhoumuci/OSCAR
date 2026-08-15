@@ -7,18 +7,23 @@
                 <transition-group name="stack" tag="div" class="stack-inner">
                     <section v-for="m in ordered" :key="m.id" class="panel float-card" :class="[
                         m.id === activeId ? 'active' : 'collapsed',
-                        mounted ? 'mounted' : ''
+                        pageMounted ? 'mounted' : ''
                     ]">
                         <button class="panel-head" type="button" @click="activate(m.id)">
                             <div class="head-left">
-                                <span class="icon">⌕</span>
+                                <span class="icon" v-html="m.icon"></span>
                                 <span class="head-title">{{ m.title }}</span>
                             </div>
                             <span class="chev" :class="{ up: m.id === activeId }">⌄</span>
                         </button>
 
-                        <div class="panel-body">
-                            <component :is="m.component" v-bind="m.props" />
+                        <div class="panel-body" :aria-hidden="m.id !== activeId">
+                            <Suspense v-if="mountedModuleIds.has(m.id)">
+                                <component :is="m.component" v-bind="m.props" :active="m.id === activeId" />
+                                <template #fallback>
+                                    <div class="module-loading" role="status">Loading {{ m.title }}…</div>
+                                </template>
+                            </Suspense>
                         </div>
                     </section>
                 </transition-group>
@@ -28,43 +33,33 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, nextTick, onMounted, ref } from "vue";
+import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 
-/** 占位组件：后面你把每个模块真正表单替换进来 */
-const Placeholder = defineComponent({
-    name: "SearchPlaceholder",
-    props: {
-        title: { type: String, required: true },
-    },
-    setup(props) {
-        return () =>
-            h("div", { class: "ph" }, [
-                h("div", { class: "ph-h" }, `Module: ${props.title}`),
-                h("div", { class: "ph-p" }, "这里放该模块的表单与结果。现在先占位，验证动画与布局逻辑。"),
-                h("div", { class: "ph-box" }),
-            ]);
-    },
-});
+defineOptions({ name: "SearchView" });
 
-type Module = {
-    id: string;
-    title: string;
-    component: any;
-    props?: Record<string, any>;
-};
+import GeneSearchCard from "@/components/search/GeneSearchCard.vue";
+
+const loadPeakSearchCard = () => import("@/components/search/PeakSearchCard.vue");
+const loadTissueSearchCard = () => import("@/components/search/TissueSearchCard.vue");
+const loadCellTypeSearchCard = () => import("@/components/search/CellTypeSearchCard.vue");
+
+const PeakSearchCard = markRaw(defineAsyncComponent(() => loadPeakSearchCard().then((module) => module.default)));
+const TissueSearchCard = markRaw(defineAsyncComponent(() => loadTissueSearchCard().then((module) => module.default)));
+const CellTypeSearchCard = markRaw(defineAsyncComponent(() => loadCellTypeSearchCard().then((module) => module.default)));
+
+type Module = { id: string; title: string; icon: string; component: any; props?: Record<string, unknown> };
 
 const initialModules: Module[] = [
-    { id: "region", title: "Search chromatin accessible regions by genome region", component: Placeholder, props: { title: "Genome region" } },
-    { id: "tissue", title: "Search chromatin accessible regions by tissue type", component: Placeholder, props: { title: "Tissue type" } },
-    { id: "tf", title: "Search chromatin accessible regions by TF", component: Placeholder, props: { title: "TF" } },
-    { id: "gene", title: "Search chromatin accessible regions by gene", component: Placeholder, props: { title: "Gene" } },
-    { id: "snp", title: "Search chromatin accessible regions by SNP", component: Placeholder, props: { title: "SNP" } },
+    { id: "gene", title: "Search associated samples by gene", icon: "⌕", component: GeneSearchCard },
+    { id: "peak", title: "Search associated samples by genomic region", icon: "⌕", component: PeakSearchCard },
+    { id: "tissue", title: "Search associated samples by tissue type", icon: "⌕", component: TissueSearchCard },
+    { id: "celltype", title: "Search associated samples by cell type", icon: "⌕", component: CellTypeSearchCard },
 ];
 
-const modules = ref<Module[]>(initialModules);
-    const activeId = ref<string | null>(initialModules[0]?.id ?? "region");
-
-const mounted = ref(false);
+const modules = shallowRef<Module[]>(initialModules);
+const activeId = ref<string | null>(initialModules[0]?.id ?? "gene");
+const mountedModuleIds = ref(new Set<string>([initialModules[0]?.id ?? "gene"]));
+const pageMounted = ref(false);
 
 const ordered = computed(() => {
     if (!activeId.value) return modules.value;
@@ -74,13 +69,70 @@ const ordered = computed(() => {
 });
 
 function activate(id: string) {
+    if (activeId.value !== id && !mountedModuleIds.value.has(id)) {
+        mountedModuleIds.value = new Set([...mountedModuleIds.value, id]);
+    }
     activeId.value = (activeId.value === id) ? null : id;
 }
 
+type IdleWindow = Window & {
+    requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+    cancelIdleCallback?: (handle: number) => void;
+};
+
+let preloadIdleHandle: number | null = null;
+let preloadTimer: number | null = null;
+let searchViewDisposed = false;
+
+async function preloadDeferredModules() {
+    const deferredModules = [
+        { id: "peak", loader: loadPeakSearchCard },
+        { id: "tissue", loader: loadTissueSearchCard },
+        { id: "celltype", loader: loadCellTypeSearchCard },
+    ];
+    for (const deferred of deferredModules) {
+        if (searchViewDisposed) return;
+        try {
+            await deferred.loader();
+            if (searchViewDisposed) return;
+            if (!mountedModuleIds.value.has(deferred.id)) {
+                mountedModuleIds.value = new Set([...mountedModuleIds.value, deferred.id]);
+                await nextTick();
+            }
+        } catch (error) {
+            console.warn("Failed to preload a search module:", error);
+        }
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+    }
+}
+
+function scheduleDeferredModulePreload() {
+    preloadTimer = window.setTimeout(() => {
+        preloadTimer = null;
+        if (searchViewDisposed) return;
+        const idleWindow = window as IdleWindow;
+        if (idleWindow.requestIdleCallback) {
+            preloadIdleHandle = idleWindow.requestIdleCallback(() => {
+                preloadIdleHandle = null;
+                void preloadDeferredModules();
+            }, { timeout: 1600 });
+            return;
+        }
+        void preloadDeferredModules();
+    }, 420);
+}
+
 onMounted(async () => {
-    // 默认打开第一个，并在首帧后触发动画
     await nextTick();
-    mounted.value = true;
+    pageMounted.value = true;
+    scheduleDeferredModulePreload();
+});
+
+onBeforeUnmount(() => {
+    searchViewDisposed = true;
+    const idleWindow = window as IdleWindow;
+    if (preloadIdleHandle !== null) idleWindow.cancelIdleCallback?.(preloadIdleHandle);
+    if (preloadTimer !== null) window.clearTimeout(preloadTimer);
 });
 </script>
 
@@ -103,21 +155,31 @@ onMounted(async () => {
     gap: 12px;
 }
 
+.module-loading {
+    min-height: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 800;
+}
+
 .stack-inner{
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.stack-move{
-  transition: transform .28s cubic-bezier(.2,.8,.2,1);
+.stack-move {
+  transition: transform .28s cubic-bezier(.2, .8, .2, 1);
 }
 
 /* panel card */
 .panel {
     overflow: hidden;
     transition:
-        transform .22s cubic-bezier(.2,.8,.2,1),
+        transform .22s cubic-bezier(.2, .8, .2, 1),
         box-shadow .22s ease,
         border-color .22s ease;
     will-change: transform;
@@ -202,16 +264,14 @@ onMounted(async () => {
     pointer-events: none;
 }
 
-.panel.active .panel-body{
-  max-height: 2000px;     
-  opacity: 1;
-  padding: 14px 14px 16px;
-  pointer-events: auto;
-
-  min-height: calc(100vh - 72px - 24px - 350px);
+.panel.active .panel-body {
+    max-height: 4000px;
+    opacity: 1;
+    padding: 14px 14px 16px;
+    pointer-events: auto;
 }
 
-/* 入场动画：默认第一个展开更自然 */
+/* Keep the original first-open motion without delaying first-content loading. */
 .panel.mounted.active {
     animation: popIn .28s ease both;
 }
@@ -228,22 +288,47 @@ onMounted(async () => {
     }
 }
 
-/* placeholder */
-.ph-h {
-    font-weight: 900;
-    margin-bottom: 8px;
+@media (max-width: 768px) {
+    .search-page,
+    .stack,
+    .stack-inner,
+    .panel,
+    .panel-body,
+    .panel-head {
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .search-page {
+        overflow-x: clip;
+        padding: 14px 0 24px;
+    }
+
+    .page-title {
+        font-size: 28px;
+    }
+
+    .panel-head {
+        gap: 10px;
+    }
+
+    .head-left {
+        min-width: 0;
+    }
+
+    .head-title {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .chev,
+    .icon {
+        flex: 0 0 auto;
+    }
+
+    .panel.active .panel-body {
+        padding: 12px;
+    }
 }
 
-.ph-p {
-    color: var(--muted);
-    line-height: 1.6;
-    margin-bottom: 12px;
-}
-
-.ph-box {
-    height: 260px;
-    border-radius: 14px;
-    border: 1px dashed var(--border-brand);
-    background: var(--surface-2);
-}
 </style>

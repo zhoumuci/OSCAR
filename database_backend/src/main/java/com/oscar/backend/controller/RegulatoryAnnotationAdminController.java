@@ -1,5 +1,6 @@
 package com.oscar.backend.controller;
 
+import com.oscar.backend.entity.GeneMarkerSummaryRefreshResponse;
 import com.oscar.backend.entity.LinkedRegionRefreshResponse;
 import com.oscar.backend.service.RegulatoryAnnotationMaintenanceService;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,9 +22,16 @@ public class RegulatoryAnnotationAdminController {
 
     @PostMapping("/linked-regions/refresh")
     public LinkedRegionRefreshResponse refreshLinkedRegions(
-            @RequestParam String datasetId,
+            @RequestParam(required = false) String datasetId,
             @RequestParam(required = false) String domain
     ) {
         return regulatoryAnnotationMaintenanceService.refreshMarkerLinkedRegions(datasetId, domain);
+    }
+
+    @PostMapping("/gene-marker-summary/refresh")
+    public GeneMarkerSummaryRefreshResponse refreshGeneMarkerSummary(
+            @RequestParam(required = false) String datasetId
+    ) {
+        return regulatoryAnnotationMaintenanceService.refreshGeneMarkerSummary(datasetId);
     }
 }

@@ -16,14 +16,14 @@
             >
               <button class="panel-head" type="button" @click="activate(m.id)">
                 <div class="head-left">
-                  <span class="icon">∑</span>
+                  <span class="icon" v-html="m.icon"></span>
                   <span class="head-title">{{ m.title }}</span>
                 </div>
                 <span class="chev" :class="{ up: m.id === activeId }">⌄</span>
               </button>
   
               <div class="panel-body">
-                <component :is="m.component" v-bind="m.props" />
+                <component :is="m.component" v-bind="m.props" :active="m.id === activeId" />
               </div>
             </section>
           </transition-group>
@@ -33,31 +33,18 @@
   </template>
   
   <script setup lang="ts">
-  import { computed, defineComponent, h, nextTick, onMounted, ref } from "vue";
-  
-  /** 占位组件：后面把每个分析模块的表单/结果替换进来 */
-  const Placeholder = defineComponent({
-    name: "AnalysisPlaceholder",
-    props: {
-      title: { type: String, required: true },
-    },
-    setup(props) {
-      return () =>
-        h("div", { class: "ph" }, [
-          h("div", { class: "ph-h" }, `Module: ${props.title}`),
-          h(
-            "div",
-            { class: "ph-p" },
-            "这里放该分析模块的参数输入与结果展示。现在先占位，验证动画与布局逻辑。"
-          ),
-          h("div", { class: "ph-box" }),
-        ]);
-    },
-  });
+  import { computed, nextTick, onMounted, ref } from "vue";
+
+defineOptions({ name: "AnalysisView" });
+  import { markRaw } from "vue";
+  import CellTypeEnrichment from "@/components/analysis/CellTypeEnrichment.vue";
+import SequencePeak2Gene from "@/components/analysis/SequencePeak2Gene.vue";
+import AnalysisPeakGeneContextPanel from "@/components/analysis/AnalysisPeakGeneContextPanel.vue";
   
   type Module = {
     id: string;
     title: string;
+    icon: string;
     component: any;
     props?: Record<string, any>;
   };
@@ -65,34 +52,31 @@
   /** ✅ Analysis：4 个模块 */
   const initialModules: Module[] = [
     {
-      id: "diff_overlap",
-      title: "Differential-overlapping chromatin accessible regions",
-      component: Placeholder,
-      props: { title: "Differential-overlapping CARs" },
+      id: "cell_type_enrichment",
+      title: "Cell type enrichment analysis",
+      icon: "∑",
+      component: markRaw(CellTypeEnrichment),
+      props: {},
     },
     {
-      id: "two_tf_overlap",
-      title: "Overlapping chromatin accessible regions co-bound by two TFs",
-      component: Placeholder,
-      props: { title: "Two-TF co-binding overlap" },
+      id: "sequence_peak2gene",
+      title: "Sequence-based peak regulatory analysis",
+      icon: "🧬",
+      component: markRaw(SequencePeak2Gene),
+      props: {},
     },
     {
-      id: "region_enrichment",
-      title: "Genomic region enrichment analysis",
-      component: Placeholder,
-      props: { title: "Genomic region enrichment" },
-    },
-    {
-      id: "gene_car_overlap",
-      title: "Gene–CAR overlapping analysis",
-      component: Placeholder,
-      props: { title: "Gene–CAR overlap" },
+      id: "peak_gene_context",
+      title: "Peak-to-Gene linkage analysis",
+      icon: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="display:block;margin:auto"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2,2"/><line x1="8" y1="2" x2="8" y2="5.5" stroke="currentColor" stroke-width="1.2"/><line x1="8" y1="10.5" x2="8" y2="14" stroke="currentColor" stroke-width="1.2"/><line x1="2" y1="8" x2="5.5" y2="8" stroke="currentColor" stroke-width="1.2"/><line x1="10.5" y1="8" x2="14" y2="8" stroke="currentColor" stroke-width="1.2"/></svg>`,
+      component: markRaw(AnalysisPeakGeneContextPanel),
+      props: {},
     },
   ];
   
   const modules = ref<Module[]>(initialModules);
   /** 默认展开第一个；并支持点击已展开模块收起（activeId=null） */
-  const activeId = ref<string | null>(initialModules[0]?.id ?? "diff_overlap");
+  const activeId = ref<string | null>(initialModules[0]?.id ?? "cell_type_enrichment");
   
   const mounted = ref(false);
   
@@ -123,19 +107,19 @@
   .page-title {
     font-size: 32px;
     font-weight: 900;
-    margin: 6px 0 14px;
+    margin: 4px 0 10px;
   }
   
   .stack {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
   }
   
   .stack-inner{
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
   }
   
   .stack-move{
@@ -231,13 +215,10 @@
   }
   
   .panel.active .panel-body{
-    max-height: 2000px;
+    max-height: 4000px;
     opacity: 1;
-    padding: 14px 14px 16px;
+    padding: 14px 16px 18px;
     pointer-events: auto;
-  
-    /* ✅ 保持你原来的“大功能区”高度逻辑 */
-    min-height: calc(100vh - 72px - 24px - 350px);
   }
   
   /* 入场动画：默认第一个展开更自然 */
@@ -274,4 +255,13 @@
     border: 1px dashed var(--border-brand);
     background: var(--surface-2);
   }
+
+@media (max-width: 768px) {
+  .analysis-layout { grid-template-columns: 1fr; }
+  .analysis-tabs { flex-wrap: wrap; gap: 8px; }
+}
+@media (max-width: 480px) {
+  .analysis-card { padding: 12px; }
+  .analysis-header { flex-direction: column; gap: 10px; align-items: flex-start; }
+}
   </style>

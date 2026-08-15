@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -38,6 +39,46 @@ public class BedtoolsRunner {
             return tabixQuery(bedGz, tbiFile, queryRegion);
         }
         return bedtoolsIntersect(queryBed, trackBed, genomeFile);
+    }
+
+    public List<String> intersectFiles(Path queryBed, Path trackBed) {
+        return bedtoolsIntersect(queryBed, trackBed, null);
+    }
+
+    public List<String> intersectRegions(Path queryBed, Path trackBed) {
+        Path bedGz = resolveBedGz(trackBed);
+        Path tbiFile = tabixIndexFor(bedGz);
+        if (bedGz == null || tbiFile == null) {
+            return bedtoolsIntersect(queryBed, trackBed, null);
+        }
+
+        List<String> candidateLines = tabixQueryRegions(bedGz, queryBed);
+        if (candidateLines.isEmpty()) return List.of();
+
+        Path candidateBed = null;
+        try {
+            candidateBed = Files.createTempFile(queryBed.getParent(), "oscar-tabix-candidates-", ".bed");
+            Files.write(
+                    candidateBed,
+                    new LinkedHashSet<>(candidateLines),
+                    StandardCharsets.UTF_8
+            );
+            return bedtoolsIntersect(queryBed, candidateBed, null);
+        } catch (IOException exception) {
+            throw new BedtoolsQueryException(
+                    "BEDTOOLS_ERROR",
+                    "failed to prepare batched tabix results: " + exception.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        } finally {
+            if (candidateBed != null) {
+                try {
+                    Files.deleteIfExists(candidateBed);
+                } catch (IOException ignored) {
+                    // Best-effort cleanup of a request-scoped temporary file.
+                }
+            }
+        }
     }
 
     /**
@@ -118,6 +159,59 @@ public class BedtoolsRunner {
             throw new BedtoolsQueryException(
                     "BEDTOOLS_ERROR",
                     "tabix query was interrupted",
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    private List<String> tabixQueryRegions(Path trackBed, Path queryBed) {
+        ProcessBuilder builder = new ProcessBuilder(
+                "tabix",
+                "-R",
+                queryBed.toString(),
+                trackBed.toString()
+        );
+
+        try {
+            Process process = builder.start();
+            CompletableFuture<List<String>> stdout = CompletableFuture.supplyAsync(() -> readLines(process.getInputStream()));
+            CompletableFuture<String> stderr = CompletableFuture.supplyAsync(() -> read(process.getErrorStream()));
+            boolean finished = process.waitFor(
+                    bedtoolsProperties.getBedtools().getTimeoutSeconds(),
+                    TimeUnit.SECONDS
+            );
+            if (!finished) {
+                process.destroyForcibly();
+                throw new BedtoolsQueryException(
+                        "BEDTOOLS_ERROR",
+                        "batched tabix query timed out after "
+                                + bedtoolsProperties.getBedtools().getTimeoutSeconds()
+                                + " seconds",
+                        HttpStatus.INTERNAL_SERVER_ERROR
+                );
+            }
+
+            List<String> lines = stdout.join();
+            String errorText = stderr.join();
+            if (process.exitValue() != 0) {
+                throw new BedtoolsQueryException(
+                        "BEDTOOLS_ERROR",
+                        "batched tabix query failed: " + summarize(errorText),
+                        HttpStatus.INTERNAL_SERVER_ERROR
+                );
+            }
+            return lines;
+        } catch (IOException exception) {
+            throw new BedtoolsQueryException(
+                    "BEDTOOLS_ERROR",
+                    "failed to start batched tabix query: " + exception.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new BedtoolsQueryException(
+                    "BEDTOOLS_ERROR",
+                    "batched tabix query was interrupted",
                     HttpStatus.INTERNAL_SERVER_ERROR
             );
         }

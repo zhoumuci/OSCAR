@@ -1,13 +1,14 @@
-// src/api/download.ts
+import axios from "axios";
+import { buildApiUrl } from "@/config/api";
+
 export type TabKey = "integration" | "rna" | "atac" | "tf";
-export type QCStatus = "pass" | "warn" | "fail";
 
 export interface DownloadFile {
   id: string;
   title: string;
-  format: string; // bed/csv/txt/zip/tsv/h5ad/pdf...
-  url: string;    // 后端/OSS 给真链接即可
-  size?: string;  // 可选
+  format: string;
+  url: string;
+  size?: string;
 }
 
 export interface DownloadGroup {
@@ -16,141 +17,168 @@ export interface DownloadGroup {
 }
 
 export interface DownloadRow {
-  sampleId: string;
-  biosampleType: string;
-  biosampleName: string;
-  cellType?: string;
-  tissueType: string;
+  datasetId: string;
+  sampleType: string;
+  tissue: string;
+  sampleName: string;
+  cells: number;
+  platform: string;
+  sourceId: string;
   disease: string;
-  category: string;
-  regionNumber?: number;
-  qc: QCStatus[];
-  downloads: DownloadGroup[];
+  sampleSource: string;
+  downloads: DownloadDomainNode[];
 }
 
-function qcPack(seed: number): QCStatus[] {
-  const arr: QCStatus[] = [];
-  for (let i = 0; i < 5; i++) {
-    const x = (seed * 97 + i * 13) % 100;
-    if (x < 78) arr.push("pass");
-    else if (x < 95) arr.push("warn");
-    else arr.push("fail");
-  }
-  return arr;
-}
-
-function makeUrl(sampleId: string, tab: TabKey, suffix: string): string {
-  // 先占位：你后面接后端时，直接返回真实 url（例如 OSS https 链接）即可
-  return `/api/download/${tab}/${sampleId}.${suffix}`;
-}
-
-function buildDownloads(sampleId: string, tab: TabKey): DownloadGroup[] {
-  if (tab === "atac") {
-    return [
-      {
-        title: "Accessible chromatin regions",
-        files: [
-          { id: `${sampleId}-bed`, title: "Regions (BED)", format: "bed", url: makeUrl(sampleId, tab, "bed"), size: "—" },
-          { id: `${sampleId}-csv`, title: "Regions (CSV)", format: "csv", url: makeUrl(sampleId, tab, "csv"), size: "—" },
-        ],
-      },
-      {
-        title: "Associated genes",
-        files: [{ id: `${sampleId}-gene`, title: "Associated genes (TXT)", format: "txt", url: makeUrl(sampleId, tab, "txt"), size: "—" }],
-      },
-    ];
-  }
-
-  if (tab === "tf") {
-    return [
-      {
-        title: "TF footprint",
-        files: [
-          { id: `${sampleId}-footprint`, title: "Footprint (TXT)", format: "txt", url: makeUrl(sampleId, tab, "txt"), size: "—" },
-          { id: `${sampleId}-bundle`, title: "Footprint bundle (ZIP)", format: "zip", url: makeUrl(sampleId, tab, "zip"), size: "—" },
-        ],
-      },
-      {
-        title: "Associated genes",
-        files: [{ id: `${sampleId}-tf-gene`, title: "TF→Gene links (TSV)", format: "tsv", url: makeUrl(sampleId, tab, "tsv"), size: "—" }],
-      },
-    ];
-  }
-
-  if (tab === "rna") {
-    return [
-      {
-        title: "Expression resources",
-        files: [
-          { id: `${sampleId}-expr`, title: "Expression matrix (TSV)", format: "tsv", url: makeUrl(sampleId, tab, "tsv"), size: "—" },
-          { id: `${sampleId}-deg`, title: "DEG table (CSV)", format: "csv", url: makeUrl(sampleId, tab, "csv"), size: "—" },
-        ],
-      },
-      {
-        title: "Gene annotation",
-        files: [{ id: `${sampleId}-anno`, title: "Gene annotation (TXT)", format: "txt", url: makeUrl(sampleId, tab, "txt"), size: "—" }],
-      },
-    ];
-  }
-
-  // integration
-  return [
-    {
-      title: "Integrated outputs",
-      files: [
-        { id: `${sampleId}-embed`, title: "Joint embedding (H5AD)", format: "h5ad", url: makeUrl(sampleId, tab, "h5ad"), size: "—" },
-        { id: `${sampleId}-links`, title: "Peak–Gene links (TSV)", format: "tsv", url: makeUrl(sampleId, tab, "tsv"), size: "—" },
-      ],
-    },
-    {
-      title: "Summary",
-      files: [{ id: `${sampleId}-report`, title: "Report (PDF)", format: "pdf", url: makeUrl(sampleId, tab, "pdf"), size: "—" }],
-    },
-  ];
-}
-
-function genRows(tab: TabKey, n: number): DownloadRow[] {
-  const tissuePool = ["Kidney", "Lung", "Brain", "Liver", "Blood", "Colon"];
-  const diseasePool = ["Normal", "Paracancerous", "Cancer", "Inflammation"];
-  const categoryPool = ["Tumor", "Normal", "Other"];
-  const cellTypePool = ["PT", "DCT", "ENDO", "LEUK", "PODO", "PEC", "MES", "CD4.T", "CD8.T"];
-
-  const rows: DownloadRow[] = [];
-  for (let i = 1; i <= n; i++) {
-    const sampleId = `Sample_H_${String(i).padStart(4, "0")}`;
-    const tissueType = tissuePool[(i * 7) % tissuePool.length];
-    const disease = diseasePool[(i * 11) % diseasePool.length];
-    const category = categoryPool[(i * 3) % categoryPool.length];
-    const biosampleType = i % 5 === 0 ? "Cell Line" : "Tissue";
-    const biosampleName = biosampleType === "Cell Line" ? "H1703" : tissueType;
-
-    const row: DownloadRow = {
-      sampleId: sampleId ?? "",
-      biosampleType: biosampleType ?? "",
-      biosampleName: biosampleName ?? "",
-      tissueType: tissueType ?? "",
-      disease: disease ?? "",
-      category: category ?? "",
-      qc: qcPack(i),
-      downloads: buildDownloads(sampleId ?? "", tab ?? ""),
-    };
-
-    if (tab === "atac" || tab === "tf") row.regionNumber = 70000 + ((i * 131) % 60000);
-    if (tab !== "rna") row.cellType = cellTypePool[(i * 5) % cellTypePool.length];
-
-    rows.push(row);
-  }
-  return rows;
-}
-
-const DB: Record<TabKey, DownloadRow[]> = {
-  integration: genRows("integration", 180),
-  rna: genRows("rna", 220),
-  atac: genRows("atac", 615),
-  tf: genRows("tf", 260),
+type DownloadSamplePayload = {
+  items?: Array<Record<string, unknown>>;
 };
 
-export async function fetchDownloadRows(tab: TabKey): Promise<DownloadRow[]> {
-  // 后端接入时替换成 axios.get(...)
-  return DB[tab];
+export async function fetchDownloadRows(_tab: TabKey): Promise<DownloadRow[]> {
+  const { data } = await axios.get<DownloadSamplePayload | Array<Record<string, unknown>>>(
+    buildApiUrl("api/download/samples"),
+    { timeout: 10000 }
+  );
+  const items = Array.isArray(data) ? data : data.items ?? [];
+  return items.map((s) => {
+    const datasetId = String(s.datasetId ?? "");
+    return {
+      datasetId,
+      sampleType: String(s.sampleType ?? "-"),
+      tissue: String(s.tissue ?? "-"),
+      sampleName: String(s.sampleName ?? "-"),
+      cells: Number(s.cellCount ?? 0),
+      platform: String(s.platform ?? "-"),
+      sourceId: String(s.sourceId ?? "-"),
+      disease: String(s.disease ?? "-"),
+      sampleSource: String(s.sampleSource ?? "-"),
+      downloads: buildDownloads(datasetId),
+    };
+  });
+}
+
+function makeUrl(sampleId: string, domain: string, fileType: string, format: string, signalType?: string): string {
+  const params = new URLSearchParams({ type: fileType, format });
+  if (signalType) params.set("signalType", signalType);
+  return buildApiUrl(`api/download/${domain}/${sampleId}?${params.toString()}`);
+}
+
+export interface DownloadDomainNode {
+  domain: string;
+  label: string;
+  color: string;
+  children: DownloadTypeNode[];
+}
+
+export interface DownloadTypeNode {
+  type: string;
+  label: string;
+  files: DownloadFile[];
+}
+
+const DOMAIN_TREE: DownloadDomainNode[] = [
+  {
+    domain: "integration",
+    label: "Integration",
+    color: "#8FA59C",
+    children: [
+      {
+        type: "gene_exp",
+        label: "GENE EXPRESSION MARKERS",
+        files: [
+          { id: "int-gene-exp-tsv", title: "Marker genes (TSV)", format: "tsv", url: "", size: "-" },
+          { id: "int-gene-exp-csv", title: "Marker genes (CSV)", format: "csv", url: "", size: "-" },
+        ],
+      },
+      {
+        type: "gene_score",
+        label: "GENE SCORE MARKERS",
+        files: [
+          { id: "int-gene-score-tsv", title: "Marker genes (TSV)", format: "tsv", url: "", size: "-" },
+          { id: "int-gene-score-csv", title: "Marker genes (CSV)", format: "csv", url: "", size: "-" },
+        ],
+      },
+      {
+        type: "marker_peak",
+        label: "MARKER PEAKS",
+        files: [
+          { id: "int-peak-tsv", title: "Marker peaks (TSV)", format: "tsv", url: "", size: "-" },
+          { id: "int-peak-csv", title: "Marker peaks (CSV)", format: "csv", url: "", size: "-" },
+        ],
+      },
+      {
+        type: "p2g_marker",
+        label: "P2G LINKS (MARKER)",
+        files: [
+          { id: "int-p2g-marker-tsv", title: "P2G Marker links (TSV)", format: "tsv", url: "", size: "-" },
+          { id: "int-p2g-marker-csv", title: "P2G Marker links (CSV)", format: "csv", url: "", size: "-" },
+        ],
+      },
+      {
+        type: "p2g",
+        label: "P2G LINKS (ALL)",
+        files: [
+          { id: "int-p2g-tsv", title: "All Peak-to-Gene links (TSV)", format: "tsv", url: "", size: "-" },
+          { id: "int-p2g-csv", title: "All Peak-to-Gene links (CSV)", format: "csv", url: "", size: "-" },
+        ],
+      },
+    ],
+  },
+  {
+    domain: "rna",
+    label: "RNA",
+    color: "#7BA7C9",
+    children: [
+      {
+        type: "marker_gene",
+        label: "MARKER GENES",
+        files: [
+          { id: "rna-marker-gene-tsv", title: "Marker genes (TSV)", format: "tsv", url: "", size: "-" },
+          { id: "rna-marker-gene-csv", title: "Marker genes (CSV)", format: "csv", url: "", size: "-" },
+        ],
+      },
+    ],
+  },
+  {
+    domain: "atac",
+    label: "ATAC",
+    color: "#E8A87C",
+    children: [
+      {
+        type: "gene_score",
+        label: "GENE SCORE MARKERS",
+        files: [
+          { id: "atac-gene-score-tsv", title: "Marker genes (TSV)", format: "tsv", url: "", size: "-" },
+          { id: "atac-gene-score-csv", title: "Marker genes (CSV)", format: "csv", url: "", size: "-" },
+        ],
+      },
+      {
+        type: "marker_peak",
+        label: "MARKER PEAKS",
+        files: [
+          { id: "atac-peak-tsv", title: "Marker peaks (TSV)", format: "tsv", url: "", size: "-" },
+          { id: "atac-peak-csv", title: "Marker peaks (CSV)", format: "csv", url: "", size: "-" },
+        ],
+      },
+    ],
+  },
+];
+
+export function buildDownloads(sampleId: string): DownloadDomainNode[] {
+  return DOMAIN_TREE.map((domainNode) => ({
+    ...domainNode,
+    children: domainNode.children.map((typeNode) => ({
+      ...typeNode,
+      files: typeNode.files.map((file) => ({
+        ...file,
+        id: `${sampleId}-${file.id}`,
+        url: makeUrl(
+          sampleId,
+          domainNode.domain,
+          typeNode.type === "p2g" ? "p2g" : typeNode.type === "p2g_marker" ? "p2g_marker" : typeNode.type === "marker_peak" ? "marker_peak" : "marker_gene",
+          file.format,
+          typeNode.type === "gene_exp" ? "gene_expression" : typeNode.type === "gene_score" ? "gene_score" : undefined
+        ),
+      })),
+    })),
+  }));
 }

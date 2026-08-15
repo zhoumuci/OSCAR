@@ -15,73 +15,159 @@ const props = defineProps<{ points: Point[] }>();
 const el = ref<HTMLDivElement | null>(null);
 let chart: echarts.ECharts | null = null;
 
-/** 读取 CSS 变量，拿到真正的颜色字符串 */
-function cssVar(name: string, fallback: string) {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return v || fallback;
-}
-
 function registerWorldIfNeeded() {
   const gj = feature(world110m as any, (world110m as any).objects.countries) as any;
   echarts.registerMap("WORLD", gj);
 }
 
+const HUB = { lon: 112.57, lat: 26.89, name: "Hengyang" };
+
+function makeFlightData(pts: Point[]) {
+  if (pts.length === 0) return [];
+  return pts.map(p => ({ coords: [[p.lon, p.lat], [HUB.lon, HUB.lat]] as [number, number][] }));
+}
+
+function continent(name: string): string {
+  const map: Record<string, string> = {
+    "China":"Asia","India":"Asia","Japan":"Asia","Indonesia":"Asia","Thailand":"Asia","Vietnam":"Asia",
+    "Malaysia":"Asia","Singapore":"Asia","Philippines":"Asia","South Korea":"Asia",
+    "Russia":"Europe","Germany":"Europe","France":"Europe","United Kingdom":"Europe","Italy":"Europe",
+    "Spain":"Europe","Netherlands":"Europe","Switzerland":"Europe","Sweden":"Europe",
+    "Nigeria":"Africa","South Africa":"Africa","Egypt":"Africa","Kenya":"Africa",
+    "United States":"North America","Canada":"North America","Mexico":"North America",
+    "Brazil":"South America","Argentina":"South America","Colombia":"South America",
+    "Australia":"Oceania","New Zealand":"Oceania",
+  };
+  return map[name] || name;
+}
+
 function render() {
   if (!el.value) return;
   if (!chart) chart = echarts.init(el.value);
-
   registerWorldIfNeeded();
 
-  const data = props.points.map((p) => ({
-    name: p.name ?? "",
-    value: [p.lon, p.lat, p.value ?? 1],
-  }));
+  const data = props.points.map(p => ({ name: p.name ?? "", value: [p.lon, p.lat, p.value ?? 1] }));
+  const flights = makeFlightData(props.points);
 
-  // ✅ 从 theme token 读取颜色（你可以在 theme.css 里控制它们）
-  const mapBg = cssVar("--map-bg", cssVar("--surface-2", "#F1F6F4"));
-  const land = cssVar("--map-land", cssVar("--surface", "#FFFFFF"));
-  const border = cssVar("--map-border", cssVar("--border", "rgba(0,0,0,0.10)"));
-  const landHover = cssVar("--map-land-hover", cssVar("--surface-3", "#E6EFEB"));
-  const dot = cssVar("--map-dot", cssVar("--brand-primary-3", "#5F7D70"));
-  const ripple = cssVar("--map-ripple", cssVar("--brand-primary", "#819D8E"));
+  const LAND = "#D6E4F0";
+  const DOT = "#8FA59C";
+  const DOT_GLOW = "rgba(143,165,156,0.50)";
+  const LINE = "rgba(143,165,156,0.28)";
+
+  // Subtle continent colour palette — all within a tight blue-gray range
+  const continentColors: Record<string, string> = {
+    "North America": "#dce7f1",
+    "Europe":        "#dae6ec",
+    "Asia":          "#d5e1ec",
+    "Africa":        "#d9e5ee",
+    "South America": "#dee8f2",
+    "Oceania":       "#e0e9f3",
+  };
+
+  // Visitor-heavy countries get a slightly deeper tint for subtle emphasis
+  const visitorCountries = new Set([
+    "China", "United States", "Singapore", "United Kingdom", "Germany",
+    "Japan", "India", "France", "Canada", "Australia", "Brazil",
+  ]);
+  const VISITOR_EMPHASIS = "#cddce8";
+
+  function buildRegions(gj: any): Array<{ name: string; itemStyle: { areaColor: string } }> {
+    const regions: Array<{ name: string; itemStyle: { areaColor: string } }> = [];
+    if (!gj?.features) return regions;
+    for (const f of gj.features) {
+      const name = f.properties?.name;
+      if (!name) continue;
+      const cont = continent(name);
+      let color = continentColors[cont] || LAND;
+      if (visitorCountries.has(name)) color = VISITOR_EMPHASIS;
+      regions.push({ name, itemStyle: { areaColor: color } });
+    }
+    return regions;
+  }
+
+  const worldGeo = feature(world110m as any, (world110m as any).objects.countries) as any;
+  const regions = buildRegions(worldGeo);
 
   chart.setOption(
     {
-      backgroundColor: mapBg, // ✅ 直接让 ECharts 画布背景 = 右侧背景
+      backgroundColor: "transparent",
       tooltip: {
         trigger: "item",
-        formatter: (p: any) => p.name || "visitor",
+        backgroundColor: "#fff",
+        borderColor: "#C4D4CD",
+        borderWidth: 1,
+        textStyle: { color: "#1B2A27", fontSize: 12 },
+        formatter: (p: any) => {
+          if (p.seriesType === "effectScatter" || p.seriesType === "scatter")
+            return p.name || "";
+          return `<b>${p.name}</b><br/>${continent(p.name)}`;
+        },
       },
       geo: {
         map: "WORLD",
         roam: true,
-        silent: true,
+        silent: false,
+        zoom: 1.8,
+        center: [30, 28],
+        regions: regions,
         itemStyle: {
-          areaColor: land,      // ✅ 陆地白/卡片白
-          borderColor: border,  // ✅ 国界线用 token
-          borderWidth: 0.8,     // ✅ 别太粗，粗了就像你截图那样“黑线横飞”
+          areaColor: LAND,
+          borderColor: "rgba(255,255,255,0.65)",
+          borderWidth: 0.5,
         },
         emphasis: {
           itemStyle: {
-            areaColor: landHover,
+            areaColor: "#c8d8e6",
+            borderColor: "#fff",
+            borderWidth: 1,
+          },
+          label: {
+            show: true,
+            color: "#1B2A27",
+            fontSize: 11,
+            fontWeight: "bold",
+            formatter: (p: any) => p.name,
           },
         },
+        label: { show: false },
       },
       series: [
+        {
+          name: "Flights",
+          type: "lines",
+          coordinateSystem: "geo",
+          polyline: false,
+          data: flights,
+          lineStyle: { color: LINE, width: 1.0, curveness: 0.3 },
+          effect: {
+            show: true,
+            period: 4,
+            trailLength: 0.2,
+            symbol: "circle",
+            symbolSize: 3,
+            color: DOT,
+          },
+          zlevel: 1,
+        },
         {
           name: "Visitors",
           type: "effectScatter",
           coordinateSystem: "geo",
-          data,
+          data: data,
           symbolSize: (val: any) => 6 + Math.min(10, (val[2] || 1) * 2),
-          itemStyle: { color: dot },
-          rippleEffect: {
-            brushType: "stroke",
-            scale: 3,
-            period: 4,
-            color: ripple,
-          },
-          emphasis: { scale: 1.1 },
+          itemStyle: { color: DOT, shadowColor: DOT_GLOW, shadowBlur: 8 },
+          rippleEffect: { brushType: "stroke", scale: 3, period: 4, color: DOT_GLOW },
+          emphasis: { scale: 1.3, itemStyle: { color: "#fff" } },
+          zlevel: 2,
+        },
+        {
+          name: "Base",
+          type: "scatter",
+          coordinateSystem: "geo",
+          data: data,
+          symbolSize: 3,
+          itemStyle: { color: DOT, opacity: 0.5 },
+          zlevel: 1,
         },
       ],
     },
@@ -90,30 +176,24 @@ function render() {
 }
 
 let ro: ResizeObserver | null = null;
-
 onMounted(() => {
   render();
   ro = new ResizeObserver(() => chart?.resize());
   if (el.value) ro.observe(el.value);
 });
-
 onBeforeUnmount(() => {
   ro?.disconnect();
   chart?.dispose();
   chart = null;
 });
-
 watch(() => props.points, () => render(), { deep: true });
 </script>
 
 <style scoped>
-.map{
+.map {
   width: 100%;
-  height: 380px;
+  height: 440px;
   border-radius: 16px;
-
-  /* ✅ 外层也用同样背景，保证边缘不露白 */
-  background: var(--map-bg);
-  border: 1px solid var(--border);
+  background: transparent;
 }
 </style>

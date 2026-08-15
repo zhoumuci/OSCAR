@@ -142,7 +142,7 @@ function downloadImage(filename: string, options?: ChartDownloadOptions) {
 
 defineExpose({ downloadImage });
 
-watch(() => [props.data, props.loading, props.error, props.embedding, props.colorBy], renderChart, { deep: true, flush: "post" });
+watch(() => [props.data, props.loading, props.error, props.embedding, props.colorBy], renderChart, { flush: "post" });
 onMounted(renderChart);
 onBeforeUnmount(disposeChart);
 </script>

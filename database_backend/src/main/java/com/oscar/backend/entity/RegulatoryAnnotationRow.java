@@ -20,6 +20,7 @@ public class RegulatoryAnnotationRow {
     private Double geneFdr;
     private Double geneMeanDiff;
     private String markerGeneSourceFile;
+    private String signalType;
     private String peakName;
     private String peakRegion;
     private String peakChromosome;
@@ -38,6 +39,8 @@ public class RegulatoryAnnotationRow {
     private Long linkedGeneCount;
     private Double correlation;
     private Double linkFdr;
+    private Double varQrna;
+    private Double varQatac;
     private String linkSource;
 
     public String getRecordKind() {
@@ -184,6 +187,14 @@ public class RegulatoryAnnotationRow {
         this.markerGeneSourceFile = markerGeneSourceFile;
     }
 
+    public String getSignalType() {
+        return signalType;
+    }
+
+    public void setSignalType(String signalType) {
+        this.signalType = signalType;
+    }
+
     public String getPeakName() {
         return peakName;
     }
@@ -327,6 +338,11 @@ public class RegulatoryAnnotationRow {
     public void setLinkFdr(Double linkFdr) {
         this.linkFdr = linkFdr;
     }
+
+    public Double getVarQrna() { return varQrna; }
+    public void setVarQrna(Double varQrna) { this.varQrna = varQrna; }
+    public Double getVarQatac() { return varQatac; }
+    public void setVarQatac(Double varQatac) { this.varQatac = varQatac; }
 
     public String getLinkSource() {
         return linkSource;

@@ -23,12 +23,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
 
     private static final String DEFAULT_DOMAIN = "integration";
-    private static final String DEFAULT_GROUP_BY = "cell_type";
     private static final int DEFAULT_MAX_NODES = 80;
     private static final int HARD_MAX_NODES = 120;
     private static final int DEFAULT_MAX_EDGES = 120;
@@ -44,8 +45,12 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
     private static final int HARD_BALANCED_TOP_GENE_LIMIT = 20;
     private static final Set<String> DOMAINS = Set.of("integration", "rna", "atac");
     private static final Set<String> MODES = Set.of("gene", "peak");
-    private static final Set<String> GROUP_BY_VALUES = Set.of("cell_type", "cluster");
-    private static final Set<String> NODE_TYPES = Set.of("gene", "peak", "group", "tf");
+    private static final Set<String> NODE_TYPES = Set.of("gene", "peak");
+    private static final Pattern GENE_SYMBOL_PATTERN = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$");
+    private static final Pattern PEAK_REGION_PATTERN = Pattern.compile(
+            "^chr[A-Za-z0-9_.-]+:(\\d+)-(\\d+)$",
+            Pattern.CASE_INSENSITIVE
+    );
 
     private final RegulatoryNetworkMapper regulatoryNetworkMapper;
 
@@ -60,9 +65,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
             String mode,
             String gene,
             String peak,
-            String groupBy,
             Double minScore,
-            Integer maxDistance,
             Integer maxNodes,
             Integer maxEdges
     ) {
@@ -70,8 +73,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
         String normalizedDomain = normalizeDomain(domain);
         String normalizedMode = normalizeMode(mode);
         String normalizedGene = normalizeGeneSymbol(gene);
-        String normalizedPeak = trimToNull(peak);
-        String normalizedGroupBy = normalizeGroupBy(groupBy);
+        String normalizedPeak = normalizePeakRegion(peak);
         Double normalizedMinScore = normalizeMinScore(minScore);
         int nodeLimit = clampLimit(maxNodes, DEFAULT_MAX_NODES, HARD_MAX_NODES);
         int edgeLimit = clampLimit(maxEdges, DEFAULT_MAX_EDGES, HARD_MAX_EDGES);
@@ -85,6 +87,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
                     normalizedDatasetId,
                     normalizedDomain,
                     normalizedGene,
+                    normalizedPeak,
                     normalizedMinScore
             );
             summary = newGraphSummary(geneNodeId(normalizedGene), "gene", totalLinks, responseEdgeLimit);
@@ -93,6 +96,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
                     normalizedDomain,
                     normalizedGene,
                     false,
+                    normalizedPeak,
                     normalizedMinScore,
                     responseEdgeLimit
             );
@@ -102,6 +106,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
                     normalizedDatasetId,
                     normalizedDomain,
                     normalizedPeak,
+                    normalizedGene,
                     normalizedMinScore
             );
             summary = newGraphSummary(peakNodeId(normalizedPeak), "peak", totalLinks, responseEdgeLimit);
@@ -109,6 +114,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
                     normalizedDatasetId,
                     normalizedDomain,
                     normalizedPeak,
+                    normalizedGene,
                     normalizedMinScore,
                     responseEdgeLimit
             );
@@ -118,6 +124,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
                     normalizedDatasetId,
                     normalizedDomain,
                     normalizedGene,
+                    null,
                     normalizedMinScore
             );
             summary = newGraphSummary(geneNodeId(normalizedGene), "gene", totalLinks, responseEdgeLimit);
@@ -126,6 +133,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
                     normalizedDomain,
                     normalizedGene,
                     false,
+                    null,
                     normalizedMinScore,
                     responseEdgeLimit
             );
@@ -145,8 +153,9 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
                 normalizedDatasetId,
                 normalizedDomain,
                 normalizedMinScore,
+                normalizedGene,
+                normalizedPeak,
                 links,
-                normalizedGroupBy,
                 nodeLimit,
                 responseEdgeLimit,
                 summary
@@ -159,20 +168,21 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
             String domain,
             String nodeId,
             String nodeType,
-            String groupBy,
+            String gene,
+            String peak,
             Double minScore,
-            Integer maxDistance,
             Integer maxNeighbors
     ) {
         String normalizedDatasetId = normalizeRequired(datasetId, "datasetId");
         String normalizedDomain = normalizeDomain(domain);
         String normalizedNodeId = normalizeRequired(nodeId, "nodeId");
         String normalizedNodeType = normalizeNodeType(nodeType);
-        String normalizedGroupBy = normalizeGroupBy(groupBy);
+        String normalizedGene = normalizeGeneSymbol(gene);
+        String normalizedPeak = normalizePeakRegion(peak);
         Double normalizedMinScore = normalizeMinScore(minScore);
         int neighborLimit = clampLimit(maxNeighbors, DEFAULT_MAX_NEIGHBORS, HARD_MAX_NEIGHBORS);
 
-        String nodeValue = trimToNull(stripNodePrefix(normalizedNodeId, normalizedNodeType));
+        String nodeValue = normalizeNodeValue(normalizedNodeId, normalizedNodeType);
         if (nodeValue == null) {
             return emptyExpansionResponse();
         }
@@ -186,6 +196,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
                     normalizedDatasetId,
                     normalizedDomain,
                     nodeValue,
+                    normalizedPeak,
                     normalizedMinScore
             );
             summary = newGraphSummary(geneNodeId(nodeValue), "gene", totalLinks, responseLinkLimit);
@@ -194,6 +205,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
                     normalizedDomain,
                     nodeValue,
                     false,
+                    normalizedPeak,
                     normalizedMinScore,
                     responseLinkLimit
             );
@@ -203,6 +215,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
                     normalizedDatasetId,
                     normalizedDomain,
                     nodeValue,
+                    normalizedGene,
                     normalizedMinScore
             );
             summary = newGraphSummary(peakNodeId(nodeValue), "peak", totalLinks, responseLinkLimit);
@@ -210,38 +223,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
                     normalizedDatasetId,
                     normalizedDomain,
                     nodeValue,
-                    normalizedMinScore,
-                    responseLinkLimit
-            );
-        } else if ("group".equals(normalizedNodeType)) {
-            Long totalLinks = countGroupLinks(
-                    normalizedDatasetId,
-                    normalizedDomain,
-                    normalizedGroupBy,
-                    nodeValue,
-                    normalizedMinScore
-            );
-            summary = newGraphSummary(groupNodeId(nodeValue), "group", totalLinks, responseLinkLimit);
-            links = selectGroupLinks(
-                    normalizedDatasetId,
-                    normalizedDomain,
-                    normalizedGroupBy,
-                    nodeValue,
-                    normalizedMinScore,
-                    responseLinkLimit
-            );
-        } else if ("tf".equals(normalizedNodeType)) {
-            Long totalLinks = regulatoryNetworkMapper.countTfLinks(
-                    normalizedDatasetId,
-                    normalizedDomain,
-                    nodeValue,
-                    normalizedMinScore
-            );
-            summary = newGraphSummary(tfNodeId(nodeValue), "tf", totalLinks, responseLinkLimit);
-            links = regulatoryNetworkMapper.selectTfLinks(
-                    normalizedDatasetId,
-                    normalizedDomain,
-                    nodeValue,
+                    normalizedGene,
                     normalizedMinScore,
                     responseLinkLimit
             );
@@ -253,8 +235,9 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
                 normalizedDatasetId,
                 normalizedDomain,
                 normalizedMinScore,
+                normalizedGene,
+                normalizedPeak,
                 links,
-                normalizedGroupBy,
                 HARD_MAX_NODES,
                 responseLinkLimit,
                 summary
@@ -279,20 +262,22 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
             String nodeId,
             Integer page,
             Integer pageSize,
-            Double minScore,
-            String groupBy
+            String gene,
+            String peak,
+            Double minScore
     ) {
         String normalizedDatasetId = normalizeRequired(datasetId, "datasetId");
         String normalizedDomain = normalizeDomain(domain);
         String normalizedNodeType = normalizeNodeType(nodeType);
         String normalizedNodeId = normalizeRequired(nodeId, "nodeId");
-        String normalizedGroupBy = normalizeGroupBy(groupBy);
+        String normalizedGene = normalizeGeneSymbol(gene);
+        String normalizedPeak = normalizePeakRegion(peak);
         Double normalizedMinScore = normalizeMinScore(minScore);
         int normalizedPage = normalizePage(page);
         int normalizedPageSize = clampLimit(pageSize, DEFAULT_PAGE_SIZE, HARD_PAGE_SIZE);
         int offset = pageOffset(normalizedPage, normalizedPageSize);
 
-        String nodeValue = trimToNull(stripNodePrefix(normalizedNodeId, normalizedNodeType));
+        String nodeValue = normalizeNodeValue(normalizedNodeId, normalizedNodeType);
         if (nodeValue == null) {
             return new RegulatoryNetworkLinkPageResponse(0L, normalizedPage, normalizedPageSize, List.of());
         }
@@ -302,13 +287,14 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
                 normalizedDomain,
                 normalizedNodeType,
                 nodeValue,
-                normalizedGroupBy,
+                normalizedGene,
+                normalizedPeak,
                 normalizedMinScore,
                 normalizedPageSize,
                 offset
         );
         List<RegulatoryNetworkLink> items = pagedLinks.items().stream()
-                .map(link -> normalizeLink(link, normalizedGroupBy))
+                .map(this::normalizeLink)
                 .filter(Objects::nonNull)
                 .toList();
         return new RegulatoryNetworkLinkPageResponse(
@@ -319,67 +305,20 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
         );
     }
 
-    private List<RegulatoryNetworkLink> selectGroupLinks(
-            String datasetId,
-            String domain,
-            String groupBy,
-            String group,
-            Double minScore,
-            int limit
-    ) {
-        if ("cluster".equals(groupBy)) {
-            BalancedQueryLimits balancedLimits = balancedQueryLimits(limit);
-            return regulatoryNetworkMapper.selectBalancedClusterLinks(
-                    datasetId,
-                    domain,
-                    group,
-                    minScore,
-                    balancedLimits.topGeneLimit(),
-                    balancedLimits.perGenePeakLimit(),
-                    limit
-            );
-        }
-
-        BalancedQueryLimits balancedLimits = balancedQueryLimits(limit);
-        return regulatoryNetworkMapper.selectBalancedCellTypeLinks(
-                datasetId,
-                domain,
-                group,
-                minScore,
-                balancedLimits.topGeneLimit(),
-                balancedLimits.perGenePeakLimit(),
-                limit
-        );
-    }
-
-    private Long countGroupLinks(
-            String datasetId,
-            String domain,
-            String groupBy,
-            String group,
-            Double minScore
-    ) {
-        if ("cluster".equals(groupBy)) {
-            return regulatoryNetworkMapper.countClusterLinks(datasetId, domain, group, minScore);
-        }
-        return regulatoryNetworkMapper.countCellTypeLinks(datasetId, domain, group, minScore);
-    }
-
     private PagedLinks selectPagedLinks(
             String datasetId,
             String domain,
             String nodeType,
             String nodeValue,
-            String groupBy,
+            String geneFilter,
+            String peakFilter,
             Double minScore,
             int limit,
             int offset
     ) {
         Long total = switch (nodeType) {
-            case "gene" -> regulatoryNetworkMapper.countGeneLinks(datasetId, domain, nodeValue, minScore);
-            case "peak" -> regulatoryNetworkMapper.countPeakLinks(datasetId, domain, nodeValue, minScore);
-            case "group" -> countGroupLinks(datasetId, domain, groupBy, nodeValue, minScore);
-            case "tf" -> regulatoryNetworkMapper.countTfLinks(datasetId, domain, nodeValue, minScore);
+            case "gene" -> regulatoryNetworkMapper.countGeneLinks(datasetId, domain, nodeValue, peakFilter, minScore);
+            case "peak" -> regulatoryNetworkMapper.countPeakLinks(datasetId, domain, nodeValue, geneFilter, minScore);
             default -> 0L;
         };
         long normalizedTotal = defaultLong(total);
@@ -388,28 +327,11 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
         }
 
         List<RegulatoryNetworkLink> items = switch (nodeType) {
-            case "gene" -> regulatoryNetworkMapper.selectGeneLinksPage(datasetId, domain, nodeValue, minScore, limit, offset);
-            case "peak" -> regulatoryNetworkMapper.selectPeakLinksPage(datasetId, domain, nodeValue, minScore, limit, offset);
-            case "group" -> selectGroupLinksPage(datasetId, domain, groupBy, nodeValue, minScore, limit, offset);
-            case "tf" -> regulatoryNetworkMapper.selectTfLinksPage(datasetId, domain, nodeValue, minScore, limit, offset);
+            case "gene" -> regulatoryNetworkMapper.selectGeneLinksPage(datasetId, domain, nodeValue, peakFilter, minScore, limit, offset);
+            case "peak" -> regulatoryNetworkMapper.selectPeakLinksPage(datasetId, domain, nodeValue, geneFilter, minScore, limit, offset);
             default -> List.of();
         };
         return new PagedLinks(normalizedTotal, items);
-    }
-
-    private List<RegulatoryNetworkLink> selectGroupLinksPage(
-            String datasetId,
-            String domain,
-            String groupBy,
-            String group,
-            Double minScore,
-            int limit,
-            int offset
-    ) {
-        if ("cluster".equals(groupBy)) {
-            return regulatoryNetworkMapper.selectClusterLinksPage(datasetId, domain, group, minScore, limit, offset);
-        }
-        return regulatoryNetworkMapper.selectCellTypeLinksPage(datasetId, domain, group, minScore, limit, offset);
     }
 
     private BalancedQueryLimits balancedQueryLimits(int finalLinkLimit) {
@@ -424,20 +346,9 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
             String datasetId,
             String domain,
             Double minScore,
+            String geneFilter,
+            String peakFilter,
             List<RegulatoryNetworkLink> rawLinks,
-            String groupBy,
-            int maxNodes,
-            int maxEdges
-    ) {
-        return buildResponse(datasetId, domain, minScore, rawLinks, groupBy, maxNodes, maxEdges, null);
-    }
-
-    private RegulatoryNetworkResponse buildResponse(
-            String datasetId,
-            String domain,
-            Double minScore,
-            List<RegulatoryNetworkLink> rawLinks,
-            String groupBy,
             int maxNodes,
             int maxEdges,
             RegulatoryNetworkGraphSummary summary
@@ -445,17 +356,25 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
         List<RegulatoryNetworkLink> normalizedLinks = rawLinks == null
                 ? List.of()
                 : rawLinks.stream()
-                .map(link -> normalizeLink(link, groupBy))
+                .map(this::normalizeLink)
                 .filter(Objects::nonNull)
                 .toList();
         List<RegulatoryNetworkLink> links = limitLinksByBudget(normalizedLinks, maxNodes, maxEdges);
-        List<RegulatoryNetworkNode> nodes = buildNodes(datasetId, domain, minScore, links);
-        List<RegulatoryNetworkEdge> edges = buildTfEdges(links);
+        List<RegulatoryNetworkNode> nodes = buildNodes(
+                datasetId,
+                domain,
+                minScore,
+                geneFilter,
+                peakFilter,
+                links
+        );
+        List<RegulatoryNetworkEdge> edges = List.of();
         boolean hasMore = normalizedLinks.size() > links.size() || normalizedLinks.size() >= maxEdges;
         if (summary != null) {
             summary.setReturnedLinks((long) links.size());
             summary.setHasMoreLinks(defaultLong(summary.getTotalLinks()) > links.size());
             decorateLinksWithGraphSummary(links, summary);
+            decorateAnchorNodeWithGraphSummary(nodes, links, summary);
             hasMore = Boolean.TRUE.equals(summary.getHasMoreLinks());
         }
 
@@ -468,7 +387,6 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
             RegulatoryNetworkGraphSummary summary
     ) {
         for (RegulatoryNetworkLink link : links) {
-            link.setTotalLinks(summary.getTotalLinks());
             link.setGraphLimit(summary.getGraphLimit());
             link.setHasMoreLinks(summary.getHasMoreLinks());
             if ("gene".equals(summary.getAnchorNodeType())) {
@@ -476,6 +394,41 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
             } else if ("peak".equals(summary.getAnchorNodeType())) {
                 link.setLinkedGenesCount(summary.getTotalLinks());
             }
+        }
+    }
+
+    private void decorateAnchorNodeWithGraphSummary(
+            List<RegulatoryNetworkNode> nodes,
+            List<RegulatoryNetworkLink> links,
+            RegulatoryNetworkGraphSummary summary
+    ) {
+        RegulatoryNetworkNode anchor = nodes.stream()
+                .filter(node -> summary.getAnchorNodeId().equals(node.getId()))
+                .findFirst()
+                .orElse(null);
+        if (anchor == null) {
+            return;
+        }
+
+        long totalLinks = defaultLong(summary.getTotalLinks());
+        if ("gene".equals(summary.getAnchorNodeType())) {
+            List<String> peaks = links.stream()
+                    .map(RegulatoryNetworkLink::getPeak)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+            anchor.setLinkedPeaksCount(totalLinks);
+            anchor.setTopLinkedPeaks(limitTopItems(peaks));
+            anchor.setRemainingLinkedPeaksCount(Math.max(0L, totalLinks - anchor.getTopLinkedPeaks().size()));
+        } else if ("peak".equals(summary.getAnchorNodeType())) {
+            List<String> genes = links.stream()
+                    .map(RegulatoryNetworkLink::getGeneSymbol)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+            anchor.setLinkedGenesCount(totalLinks);
+            anchor.setTopLinkedGenes(limitTopItems(genes));
+            anchor.setRemainingLinkedGenesCount(Math.max(0L, totalLinks - anchor.getTopLinkedGenes().size()));
         }
     }
 
@@ -495,16 +448,12 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
         );
     }
 
-    private RegulatoryNetworkLink normalizeLink(RegulatoryNetworkLink link, String groupBy) {
+    private RegulatoryNetworkLink normalizeLink(RegulatoryNetworkLink link) {
         String peak = trimToNull(link.getPeak());
         String gene = trimToNull(link.getGeneSymbol());
         if (peak == null || gene == null) {
             return null;
         }
-
-        String cellType = trimToNull(link.getCellTypeGroup());
-        String cluster = trimToNull(link.getClusterGroup());
-        String group = "cluster".equals(groupBy) ? cluster : cellType;
 
         link.setPeak(peak);
         link.setPeakId(peak);
@@ -517,10 +466,6 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
         link.setScore(score);
         link.setLinkScore(score);
         link.setDistanceToTss(null);
-        link.setGroup(group);
-        link.setCellTypeGroup("cell_type".equals(groupBy) ? cellType : null);
-        link.setClusterGroup("cluster".equals(groupBy) ? cluster : null);
-        link.setMarkerStatus(trimToNull(link.getMarkerStatus()));
         link.setLinkType("peak_to_gene");
         link.setProvenanceSource(trimToNull(link.getProvenanceSource()));
         link.setSource(getDisplaySource(link));
@@ -574,12 +519,6 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
         Set<String> nodeIds = new LinkedHashSet<>();
         nodeIds.add(geneNodeId(link.getGeneSymbol()));
         nodeIds.add(peakNodeId(link.getPeak()));
-        if (link.getGroup() != null) {
-            nodeIds.add(groupNodeId(link.getGroup()));
-        }
-        if (link.getTfName() != null) {
-            nodeIds.add(tfNodeId(link.getTfName()));
-        }
         return nodeIds;
     }
 
@@ -587,6 +526,8 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
             String datasetId,
             String domain,
             Double minScore,
+            String geneFilter,
+            String peakFilter,
             List<RegulatoryNetworkLink> links
     ) {
         Map<String, RegulatoryNetworkNode> nodeMap = new LinkedHashMap<>();
@@ -600,10 +541,34 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
-        Map<String, RegulatoryNetworkSummaryRow> geneSummaries = selectGeneSummaryMap(datasetId, domain, genes, minScore);
-        Map<String, List<String>> topPeaksByGene = selectTopPeaksByGene(datasetId, domain, genes, minScore);
-        Map<String, RegulatoryNetworkSummaryRow> peakSummaries = selectPeakSummaryMap(datasetId, domain, peaks, minScore);
-        Map<String, List<String>> topGenesByPeak = selectTopGenesByPeak(datasetId, domain, peaks, minScore);
+        Map<String, RegulatoryNetworkSummaryRow> geneSummaries = selectGeneSummaryMap(
+                datasetId,
+                domain,
+                genes,
+                peakFilter,
+                minScore
+        );
+        Map<String, List<String>> topPeaksByGene = selectTopPeaksByGene(
+                datasetId,
+                domain,
+                genes,
+                peakFilter,
+                minScore
+        );
+        Map<String, RegulatoryNetworkSummaryRow> peakSummaries = selectPeakSummaryMap(
+                datasetId,
+                domain,
+                peaks,
+                geneFilter,
+                minScore
+        );
+        Map<String, List<String>> topGenesByPeak = selectTopGenesByPeak(
+                datasetId,
+                domain,
+                peaks,
+                geneFilter,
+                minScore
+        );
 
         for (String gene : genes) {
             RegulatoryNetworkNode node = new RegulatoryNetworkNode();
@@ -623,10 +588,6 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
             applySharedNodeContext(node, links);
             applyPeakSummary(node, peakSummaries.get(peak), topGenesByPeak.getOrDefault(peak, List.of()));
             nodeMap.put(node.getId(), node);
-        }
-
-        for (RegulatoryNetworkNode tfNode : buildTfNodes(links)) {
-            nodeMap.putIfAbsent(tfNode.getId(), tfNode);
         }
 
         return new ArrayList<>(nodeMap.values());
@@ -652,13 +613,13 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
         node.setDatasetId(first.getDatasetId());
         node.setSampleName(first.getSampleName());
         node.setDomain(first.getDomain());
-        node.setGroup(first.getGroup());
     }
 
     private Map<String, RegulatoryNetworkSummaryRow> selectGeneSummaryMap(
             String datasetId,
             String domain,
             List<String> genes,
+            String peakFilter,
             Double minScore
     ) {
         if (genes.isEmpty()) {
@@ -666,7 +627,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
         }
 
         Map<String, RegulatoryNetworkSummaryRow> summaryMap = new LinkedHashMap<>();
-        regulatoryNetworkMapper.selectGeneSummaries(datasetId, domain, genes, minScore)
+        regulatoryNetworkMapper.selectGeneSummaries(datasetId, domain, genes, peakFilter, minScore)
                 .forEach(summary -> summaryMap.put(summary.getNodeKey(), summary));
         return summaryMap;
     }
@@ -675,19 +636,27 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
             String datasetId,
             String domain,
             List<String> genes,
+            String peakFilter,
             Double minScore
     ) {
         if (genes.isEmpty()) {
             return Map.of();
         }
 
-        return groupTopItems(regulatoryNetworkMapper.selectTopPeaksForGenes(datasetId, domain, genes, minScore));
+        return groupTopItems(regulatoryNetworkMapper.selectTopPeaksForGenes(
+                datasetId,
+                domain,
+                genes,
+                peakFilter,
+                minScore
+        ));
     }
 
     private Map<String, RegulatoryNetworkSummaryRow> selectPeakSummaryMap(
             String datasetId,
             String domain,
             List<String> peaks,
+            String geneFilter,
             Double minScore
     ) {
         if (peaks.isEmpty()) {
@@ -695,7 +664,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
         }
 
         Map<String, RegulatoryNetworkSummaryRow> summaryMap = new LinkedHashMap<>();
-        regulatoryNetworkMapper.selectPeakSummaries(datasetId, domain, peaks, minScore)
+        regulatoryNetworkMapper.selectPeakSummaries(datasetId, domain, peaks, geneFilter, minScore)
                 .forEach(summary -> summaryMap.put(summary.getNodeKey(), summary));
         return summaryMap;
     }
@@ -704,13 +673,20 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
             String datasetId,
             String domain,
             List<String> peaks,
+            String geneFilter,
             Double minScore
     ) {
         if (peaks.isEmpty()) {
             return Map.of();
         }
 
-        return groupTopItems(regulatoryNetworkMapper.selectTopGenesForPeaks(datasetId, domain, peaks, minScore));
+        return groupTopItems(regulatoryNetworkMapper.selectTopGenesForPeaks(
+                datasetId,
+                domain,
+                peaks,
+                geneFilter,
+                minScore
+        ));
     }
 
     private Map<String, List<String>> groupTopItems(List<RegulatoryNetworkTopItemRow> rows) {
@@ -790,56 +766,6 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
         return Math.min(requestedLimit, LOCAL_NODE_LINK_LIMIT);
     }
 
-    private List<RegulatoryNetworkNode> buildTfNodes(List<RegulatoryNetworkLink> links) {
-        Map<String, RegulatoryNetworkNode> nodeMap = new LinkedHashMap<>();
-        for (RegulatoryNetworkLink link : links) {
-            String tfName = link.getTfName();
-            if (tfName == null) {
-                continue;
-            }
-
-            String nodeId = tfNodeId(tfName);
-            RegulatoryNetworkNode node = new RegulatoryNetworkNode();
-            node.setId(nodeId);
-            node.setType("tf");
-            node.setLabel(tfName);
-            node.setDatasetId(link.getDatasetId());
-            node.setSampleName(link.getSampleName());
-            node.setDomain(link.getDomain());
-            nodeMap.putIfAbsent(nodeId, node);
-        }
-
-        return new ArrayList<>(nodeMap.values());
-    }
-
-    private List<RegulatoryNetworkEdge> buildTfEdges(List<RegulatoryNetworkLink> links) {
-        Map<String, RegulatoryNetworkEdge> edgeMap = new LinkedHashMap<>();
-        for (RegulatoryNetworkLink link : links) {
-            String tfName = link.getTfName();
-            if (tfName == null) {
-                continue;
-            }
-
-            String source = tfNodeId(tfName);
-            String target = peakNodeId(link.getPeak());
-            String edgeKey = source + "|" + target + "|tf_to_peak";
-            RegulatoryNetworkEdge edge = new RegulatoryNetworkEdge();
-            edge.setSource(source);
-            edge.setTarget(target);
-            edge.setType("tf_to_peak");
-            edge.setScore(link.getScore());
-            edge.setCorrelation(link.getCorrelation());
-            edge.setFdr(link.getFdr());
-            edge.setVarQAtac(link.getVarQAtac());
-            edge.setVarQRna(link.getVarQRna());
-            edge.setDistanceToTss(null);
-            edge.setSourceMethod(link.getSource());
-            edgeMap.putIfAbsent(edgeKey, edge);
-        }
-
-        return new ArrayList<>(edgeMap.values());
-    }
-
     private RegulatoryNetworkExpansionResponse emptyExpansionResponse() {
         return new RegulatoryNetworkExpansionResponse(List.of(), List.of(), List.of(), 0L, false, 0L);
     }
@@ -864,19 +790,7 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
     private String normalizeNodeType(String nodeType) {
         String value = normalizeRequired(nodeType, "nodeType").toLowerCase(Locale.ROOT);
         if (!NODE_TYPES.contains(value)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "nodeType must be gene, peak, group, or tf");
-        }
-        return value;
-    }
-
-    private String normalizeGroupBy(String groupBy) {
-        String normalized = trimToNull(groupBy);
-        String value = normalized == null ? DEFAULT_GROUP_BY : normalized.toLowerCase(Locale.ROOT);
-        if ("celltype".equals(value)) {
-            value = "cell_type";
-        }
-        if (!GROUP_BY_VALUES.contains(value)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "groupBy must be cell_type or cluster");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "nodeType must be gene or peak");
         }
         return value;
     }
@@ -922,7 +836,54 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
 
     private String normalizeGeneSymbol(String value) {
         String trimmed = trimToNull(value);
-        return trimmed == null ? null : trimmed.toUpperCase(Locale.ROOT);
+        if (trimmed == null) {
+            return null;
+        }
+        if (!GENE_SYMBOL_PATTERN.matcher(trimmed).matches()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "gene must be a single gene symbol using letters, numbers, '.', '_' or '-'"
+            );
+        }
+        return trimmed.toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizePeakRegion(String value) {
+        String trimmed = trimToNull(value);
+        if (trimmed == null) {
+            return null;
+        }
+
+        Matcher matcher = PEAK_REGION_PATTERN.matcher(trimmed);
+        if (!matcher.matches()) {
+            throw invalidPeakRegion();
+        }
+
+        try {
+            long start = Long.parseLong(matcher.group(1));
+            long end = Long.parseLong(matcher.group(2));
+            if (start < 0 || end <= start) {
+                throw invalidPeakRegion();
+            }
+        } catch (NumberFormatException exception) {
+            throw invalidPeakRegion();
+        }
+        return trimmed;
+    }
+
+    private String normalizeNodeValue(String nodeId, String nodeType) {
+        String value = trimToNull(stripNodePrefix(nodeId, nodeType));
+        if (value == null) {
+            return null;
+        }
+        return "gene".equals(nodeType) ? normalizeGeneSymbol(value) : normalizePeakRegion(value);
+    }
+
+    private ResponseStatusException invalidPeakRegion() {
+        return new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "peak must be a single region in chr:start-end format with end greater than start"
+        );
     }
 
     private String trimToNull(String value) {
@@ -940,14 +901,6 @@ public class RegulatoryNetworkServiceImpl implements RegulatoryNetworkService {
 
     private String peakNodeId(String peak) {
         return "peak:" + peak;
-    }
-
-    private String groupNodeId(String group) {
-        return "group:" + group;
-    }
-
-    private String tfNodeId(String tfName) {
-        return "tf:" + tfName;
     }
 
     private record BalancedQueryLimits(int topGeneLimit, int perGenePeakLimit) {

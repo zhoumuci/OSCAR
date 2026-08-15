@@ -8,6 +8,8 @@ export interface BrowseSampleQuery {
   tissue?: string;
   page: number;
   pageSize: number;
+  sortBy?: string;
+  sortDir?: string;
 }
 
 export interface BrowseFacetQuery {

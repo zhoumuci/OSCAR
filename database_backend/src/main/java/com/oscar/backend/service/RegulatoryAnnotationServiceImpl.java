@@ -6,19 +6,29 @@ import com.oscar.backend.entity.RegulatoryAnnotationResponse;
 import com.oscar.backend.entity.RegulatoryAnnotationRow;
 import com.oscar.backend.entity.RegulatoryTfSummaryResponse;
 import com.oscar.backend.mapper.RegulatoryAnnotationMapper;
+import org.apache.ibatis.cursor.Cursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationService {
@@ -28,6 +38,9 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
     private static final int DEFAULT_PAGE = 1;
     private static final int DEFAULT_PAGE_SIZE = 10;
     private static final int HARD_PAGE_SIZE = 100;
+    private static final Pattern PEAK_REGION_PATTERN = Pattern.compile(
+            "^([^:\\s]+)\\s*:\\s*(\\d[\\d,]*)\\s*-\\s*(\\d[\\d,]*)$"
+    );
 
     private final RegulatoryAnnotationMapper regulatoryAnnotationMapper;
     private final RegulatoryAnnotationCountCache countCache;
@@ -53,7 +66,12 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
             String contextCellType,
             String contextCluster,
             Double maxFdr,
-            Double minLog2fc
+            Double minLog2fc,
+            Double minP2gScore,
+            String signalType,
+            String sortBy,
+            String sortOrder,
+            String p2gMode
     ) {
         long overallStartedAt = System.nanoTime();
         String normalizedDatasetId = normalizeRequired(datasetId, "datasetId");
@@ -61,6 +79,10 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
         AnnotationType normalizedAnnotationType = normalizeAnnotationType(annotationType, normalizedDomain);
         int normalizedPage = normalizePage(page);
         int normalizedPageSize = normalizePageSize(pageSize);
+        String annotationOrderBy = normalizeAnnotationOrderBy(
+                normalizedAnnotationType, sortBy, sortOrder, false);
+        String fallbackOrderBy = normalizeAnnotationOrderBy(
+                normalizedAnnotationType, sortBy, sortOrder, true);
         ensureVisibleSampleExists(normalizedDatasetId);
 
         RegionFilter normalizedRegionType = normalizeRegionType(regionType);
@@ -88,18 +110,35 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
 
         Double normalizedMaxFdr = normalizeOptionalDouble(maxFdr);
         Double normalizedMinLog2fc = normalizeMinLog2fc(minLog2fc);
+        Double normalizedMinP2gScore = normalizedAnnotationType == AnnotationType.LINKED_REGION
+                ? normalizeMinimumScore(minP2gScore)
+                : null;
         String countRegionType = normalizedAnnotationType == AnnotationType.LINKED_REGION
                 ? "p2g_link_id"
                 : effectiveRegionType.name().toLowerCase(Locale.ROOT);
-        FilterPatterns filters = buildFilterPatterns(normalizedAnnotationType, targetGene, peak, contextCellType, contextCluster);
+        String normalizedContextCellType = normalizeContextCellType(normalizedDomain, contextCellType);
+        FilterPatterns filters = buildFilterPatterns(
+                normalizedAnnotationType, targetGene, peak, normalizedContextCellType, contextCluster);
+        PeakSearchFilter markerPeakFilter = normalizedAnnotationType == AnnotationType.MARKER_PEAK
+                ? parsePeakSearchFilter(filters.peakQuery())
+                : PeakSearchFilter.empty();
+        PeakSearchFilter p2gPeakFilter = normalizedAnnotationType == AnnotationType.LINKED_REGION
+                ? parsePeakSearchFilter(peak)
+                : PeakSearchFilter.empty();
+        String countPeakKey = switch (normalizedAnnotationType) {
+            case MARKER_PEAK -> markerPeakFilter.cacheKey();
+            case LINKED_REGION -> p2gPeakFilter.cacheKey();
+            default -> filters.peakQuery();
+        };
         CountFilters countFilters = new CountFilters(
                 filters.targetGene(),
-                filters.peakPattern(),
+                countPeakKey,
                 filters.contextCellType(),
                 filters.contextCluster(),
                 countRegionType,
                 normalizedMaxFdr,
-                normalizedMinLog2fc
+                normalizedMinLog2fc,
+                normalizedMinP2gScore
         );
         long offset = pageOffset(normalizedPage, normalizedPageSize);
         PagedRows pageRows = switch (normalizedAnnotationType) {
@@ -113,37 +152,43 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                     normalizedMinLog2fc,
                     countFilters,
                     normalizedPageSize,
-                    offset
+                    offset,
+                    normalizeSignalType(signalType),
+                    annotationOrderBy
             );
             case MARKER_PEAK -> selectMarkerPeakRows(
                     normalizedDatasetId,
                     normalizedDomain,
                     filters.targetGene(),
-                    filters.peakPattern(),
+                    markerPeakFilter,
                     filters.contextCellType(),
                     filters.contextCluster(),
                     normalizedMaxFdr,
                     normalizedMinLog2fc,
                     countFilters,
                     normalizedPageSize,
-                    offset
+                    offset,
+                    annotationOrderBy
             );
             case LINKED_REGION -> selectLinkedRegionRows(
                     normalizedDatasetId,
                     normalizedDomain,
                     filters.targetGene(),
-                    filters.peakPattern(),
+                    p2gPeakFilter,
                     filters.contextCellType(),
                     filters.contextCluster(),
-                    normalizedMaxFdr,
-                    normalizedMinLog2fc,
+                    normalizedMinP2gScore,
                     countFilters,
                     normalizedPageSize,
-                    offset
+                    offset,
+                    annotationOrderBy,
+                    fallbackOrderBy,
+                    p2gMode
             );
         };
 
         long hydrateStartedAt = System.nanoTime();
+        prepareRowCellTypes(pageRows.rows(), normalizedDomain);
         List<RegulatoryAnnotationRecord> records = new ArrayList<>();
         pageRows.rows()
                 .stream()
@@ -176,6 +221,202 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public void streamRegulatoryAnnotationsCsv(
+            String datasetId,
+            String domain,
+            String annotationType,
+            String targetGene,
+            String peak,
+            String regionType,
+            String contextCellType,
+            String contextCluster,
+            Double maxFdr,
+            Double minLog2fc,
+            Double minP2gScore,
+            String signalType,
+            String sortBy,
+            String sortOrder,
+            String p2gMode,
+            String sampleLabel,
+            OutputStream outputStream
+    ) throws IOException {
+        String normalizedDatasetId = normalizeRequired(datasetId, "datasetId");
+        String normalizedDomain = normalizeDomain(domain);
+        AnnotationType normalizedAnnotationType = normalizeAnnotationType(annotationType, normalizedDomain);
+        ensureVisibleSampleExists(normalizedDatasetId);
+
+        RegionFilter normalizedRegionType = normalizeRegionType(regionType);
+        RegionFilter effectiveRegionType = normalizedAnnotationType == AnnotationType.LINKED_REGION
+                ? RegionFilter.ALL
+                : normalizedRegionType;
+        Double normalizedMaxFdr = normalizeOptionalDouble(maxFdr);
+        Double normalizedMinLog2fc = normalizeMinLog2fc(minLog2fc);
+        Double normalizedMinP2gScore = normalizedAnnotationType == AnnotationType.LINKED_REGION
+                ? normalizeMinimumScore(minP2gScore)
+                : null;
+        String normalizedContextCellType = normalizeContextCellType(normalizedDomain, contextCellType);
+        FilterPatterns filters = buildFilterPatterns(
+                normalizedAnnotationType, targetGene, peak, normalizedContextCellType, contextCluster);
+        PeakSearchFilter markerPeakFilter = normalizedAnnotationType == AnnotationType.MARKER_PEAK
+                ? parsePeakSearchFilter(filters.peakQuery())
+                : PeakSearchFilter.empty();
+        PeakSearchFilter p2gPeakFilter = normalizedAnnotationType == AnnotationType.LINKED_REGION
+                ? parsePeakSearchFilter(peak)
+                : PeakSearchFilter.empty();
+        String annotationOrderBy = normalizeAnnotationOrderBy(
+                normalizedAnnotationType, sortBy, sortOrder, false);
+        String fallbackOrderBy = normalizeAnnotationOrderBy(
+                normalizedAnnotationType, sortBy, sortOrder, true);
+        String normalizedP2gMode = "all".equalsIgnoreCase(p2gMode) ? "all" : "marker";
+        String sourceLabel = normalizedDatasetId + " / " + firstNonBlank(
+                trimToNull(sampleLabel), domainDisplayName(normalizedDomain));
+
+        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8), 64 * 1024);
+        writeCsvHeader(writer, normalizedAnnotationType, normalizedP2gMode, normalizedDomain);
+        writer.flush();
+
+        if (!supportsRegionType(normalizedAnnotationType, effectiveRegionType)) {
+            return;
+        }
+
+        try (Cursor<RegulatoryAnnotationRow> cursor = switch (normalizedAnnotationType) {
+            case MARKER_GENE -> regulatoryAnnotationMapper.streamMarkerGenes(
+                    normalizedDatasetId, normalizedDomain, filters.targetGene(),
+                    filters.contextCellType(), filters.contextCluster(), normalizedMaxFdr,
+                    normalizedMinLog2fc, normalizeSignalType(signalType), annotationOrderBy);
+            case MARKER_PEAK -> regulatoryAnnotationMapper.streamMarkerPeaks(
+                    normalizedDatasetId, normalizedDomain, filters.targetGene(),
+                    markerPeakFilter.exactPeak(), markerPeakFilter.chromosome(), markerPeakFilter.start(),
+                    markerPeakFilter.end(), filters.contextCellType(), filters.contextCluster(),
+                    normalizedMaxFdr, normalizedMinLog2fc, annotationOrderBy);
+            case LINKED_REGION -> "all".equals(normalizedP2gMode)
+                    ? regulatoryAnnotationMapper.streamP2gDirect(
+                            normalizedDatasetId, normalizedDomain, filters.targetGene(),
+                            p2gPeakFilter.exactPeak(), p2gPeakFilter.chromosome(), p2gPeakFilter.start(),
+                            p2gPeakFilter.end(), filters.contextCellType(), filters.contextCluster(),
+                            normalizedMinP2gScore, fallbackOrderBy)
+                    : regulatoryAnnotationMapper.streamLinkedRegions(
+                            normalizedDatasetId, normalizedDomain, filters.targetGene(),
+                            p2gPeakFilter.exactPeak(), p2gPeakFilter.chromosome(), p2gPeakFilter.start(),
+                            p2gPeakFilter.end(), filters.contextCellType(), filters.contextCluster(),
+                            normalizedMinP2gScore, annotationOrderBy);
+        }) {
+            int writtenRows = 0;
+            for (RegulatoryAnnotationRow row : cursor) {
+                RegulatoryAnnotationRecord record = toRecord(normalizedAnnotationType, effectiveRegionType, row);
+                if (record == null) continue;
+                record.setDomain(normalizedDomain);
+                writeCsvRecord(writer, normalizedAnnotationType, normalizedP2gMode, normalizedDomain, sourceLabel, record);
+                if (++writtenRows % 1_000 == 0) writer.flush();
+            }
+        }
+        writer.flush();
+    }
+
+    private void writeCsvHeader(
+            BufferedWriter writer,
+            AnnotationType annotationType,
+            String p2gMode,
+            String domain
+    ) throws IOException {
+        String contextHeader = "integration".equals(domain) ? "Cell / Cluster" : "Cluster";
+        switch (annotationType) {
+            case MARKER_GENE -> writeCsvRow(writer,
+                    "Gene", contextHeader, "Gene region", "Promoter region", "Strand",
+                    "Log2FC", "FDR", "MeanDiff", "Sample");
+            case MARKER_PEAK -> writeCsvRow(writer,
+                    "Peak", contextHeader, "Linked gene", "Log2FC", "FDR", "MeanDiff", "Sample");
+            case LINKED_REGION -> {
+                if ("all".equals(p2gMode)) {
+                    writeCsvRow(writer,
+                            "Gene", "Linked peak", "P2G score", "FDR", "VarQ RNA", "VarQ ATAC", "Sample");
+                } else {
+                    writeCsvRow(writer,
+                            "Gene", contextHeader, "Linked peak", "P2G score", "Gene Diff",
+                            "Peak Diff", "Gene marker type", "Sample");
+                }
+            }
+        }
+    }
+
+    private void writeCsvRecord(
+            BufferedWriter writer,
+            AnnotationType annotationType,
+            String p2gMode,
+            String domain,
+            String sourceLabel,
+            RegulatoryAnnotationRecord record
+    ) throws IOException {
+        switch (annotationType) {
+            case MARKER_GENE -> writeCsvRow(writer,
+                    record.getTargetGene(), csvContext(record, domain), record.getGeneRegion(),
+                    record.getPromoterRegion(), record.getStrand(), csvMetric(record.getGeneLog2fc()),
+                    csvMetric(record.getGeneFdr()), csvMetric(record.getGeneMeanDiff()), sourceLabel);
+            case MARKER_PEAK -> writeCsvRow(writer,
+                    firstNonBlank(record.getPeakRegion(), record.getPeakName()), csvContext(record, domain),
+                    record.getLinkedGene(), csvMetric(record.getPeakLog2fc()), csvMetric(record.getPeakFdr()),
+                    csvMetric(record.getPeakMeanDiff()), sourceLabel);
+            case LINKED_REGION -> {
+                String linkedPeak = firstNonBlank(record.getLinkedPeak(), record.getPeakRegion(), record.getPeakName());
+                if ("all".equals(p2gMode)) {
+                    writeCsvRow(writer,
+                            record.getTargetGene(), linkedPeak, csvMetric(record.getLinkScore()),
+                            csvMetric(record.getLinkFdr()), csvMetric(record.getVarQrna()),
+                            csvMetric(record.getVarQatac()), sourceLabel);
+                } else {
+                    writeCsvRow(writer,
+                            record.getTargetGene(), csvContext(record, domain), linkedPeak,
+                            csvMetric(record.getLinkScore()), csvMarkerEvidence(record.getGeneLog2fc(), record.getGeneFdr()),
+                            csvMarkerEvidence(record.getPeakLog2fc(), record.getPeakFdr()),
+                            firstNonBlank(record.getSignalType(), "-"), sourceLabel);
+                }
+            }
+        }
+    }
+
+    private String csvContext(RegulatoryAnnotationRecord record, String domain) {
+        String cluster = trimToNull(record.getClusterLabel());
+        if (!"integration".equals(domain)) return firstNonBlank(cluster, "-");
+        String cellType = trimToNull(record.getCellType());
+        if (cellType == null) return firstNonBlank(cluster, "-");
+        if (cluster == null || cellType.equalsIgnoreCase(cluster)) return cellType;
+        return cellType + " / " + cluster;
+    }
+
+    private String csvMarkerEvidence(Double log2fc, Double fdr) {
+        List<String> values = new ArrayList<>(2);
+        if (log2fc != null) values.add("L2FC " + csvMetric(log2fc));
+        if (fdr != null) values.add("FDR " + csvMetric(fdr));
+        return values.isEmpty() ? "-" : String.join(" / ", values);
+    }
+
+    private String csvMetric(Double value) {
+        return value == null ? "-" : BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+    }
+
+    private void writeCsvRow(BufferedWriter writer, Object... values) throws IOException {
+        for (int index = 0; index < values.length; index++) {
+            if (index > 0) writer.write(',');
+            String value = values[index] == null ? "" : String.valueOf(values[index]);
+            writer.write('"');
+            writer.write(value.replace("\"", "\"\""));
+            writer.write('"');
+        }
+        writer.write('\n');
+    }
+
+    private String domainDisplayName(String domain) {
+        return switch (domain) {
+            case "rna" -> "RNA";
+            case "atac" -> "ATAC";
+            case "integration" -> "Integration";
+            default -> domain;
+        };
+    }
+
+    @Override
+    @org.springframework.cache.annotation.Cacheable(value = "contextOptions", key = "#datasetId + ':' + #domain + ':' + #annotationType")
     public List<RegulatoryAnnotationContextOption> getRegulatoryAnnotationContextOptions(
             String datasetId,
             String domain,
@@ -194,7 +435,7 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                     normalizedDomain
             );
         };
-        return normalizeContextOptions(options);
+        return normalizeContextOptions(options, normalizedDomain);
     }
 
     @Override
@@ -280,13 +521,16 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
             Double minLog2fc,
             CountFilters countFilters,
             int limit,
-            long offset
+            long offset,
+            String signalType,
+            String orderBy
     ) {
         RegulatoryAnnotationCountCache.CountResult countResult = cachedCount(
                 AnnotationType.MARKER_GENE,
                 datasetId,
                 domain,
                 countFilters,
+                signalType,
                 () -> regulatoryAnnotationMapper.countMarkerGenes(
                         datasetId,
                         domain,
@@ -294,7 +538,8 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                         contextCellType,
                         contextCluster,
                         maxFdr,
-                        minLog2fc
+                        minLog2fc,
+                        signalType
                 )
         );
         long total = countResult.total();
@@ -313,6 +558,8 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                 contextCluster,
                 maxFdr,
                 minLog2fc,
+                signalType,
+                orderBy,
                 limit,
                 intOffset(offset)
         );
@@ -323,25 +570,30 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
             String datasetId,
             String domain,
             String targetGene,
-            String peakPattern,
+            PeakSearchFilter peakFilter,
             String contextCellType,
             String contextCluster,
             Double maxFdr,
             Double minLog2fc,
             CountFilters countFilters,
             int limit,
-            long offset
+            long offset,
+            String orderBy
     ) {
         RegulatoryAnnotationCountCache.CountResult countResult = cachedCount(
                 AnnotationType.MARKER_PEAK,
                 datasetId,
                 domain,
                 countFilters,
+                null,
                 () -> regulatoryAnnotationMapper.countMarkerPeaks(
                         datasetId,
                         domain,
                         targetGene,
-                        peakPattern,
+                        peakFilter.exactPeak(),
+                        peakFilter.chromosome(),
+                        peakFilter.start(),
+                        peakFilter.end(),
                         contextCellType,
                         contextCluster,
                         maxFdr,
@@ -360,67 +612,80 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                 datasetId,
                 dataDomain,
                 targetGene,
-                peakPattern,
+                peakFilter.exactPeak(),
+                peakFilter.chromosome(),
+                peakFilter.start(),
+                peakFilter.end(),
                 contextCellType,
                 contextCluster,
                 maxFdr,
                 minLog2fc,
+                orderBy,
                 limit,
                 intOffset(offset)
         );
         if (pageIds == null || pageIds.isEmpty()) {
             return new PagedRows(dataDomain, total, List.of(), countMillis, elapsedMillis(pageStartedAt), 0L, "marker_peak", countCacheHit);
         }
-        List<RegulatoryAnnotationRow> rows = regulatoryAnnotationMapper.selectMarkerPeaksByIds(pageIds);
+        List<RegulatoryAnnotationRow> rows = regulatoryAnnotationMapper.selectMarkerPeaksByIds(pageIds, targetGene);
         long pageQueryMillis = elapsedMillis(pageStartedAt);
-        long hydrateStartedAt = System.nanoTime();
-        mergeMarkerPeakLinkSummaries(datasetId, dataDomain, rows);
-        long hydrateMillis = elapsedMillis(hydrateStartedAt);
-        return new PagedRows(dataDomain, total, rows, countMillis, pageQueryMillis, hydrateMillis, "marker_peak", countCacheHit);
+        return new PagedRows(dataDomain, total, rows, countMillis, pageQueryMillis, 0L, "marker_peak", countCacheHit);
     }
 
     private PagedRows selectLinkedRegionRows(
             String datasetId,
             String domain,
             String targetGene,
-            String peakPattern,
+            PeakSearchFilter peakFilter,
             String contextCellType,
             String contextCluster,
-            Double maxFdr,
-            Double minLog2fc,
+            Double minP2gScore,
             CountFilters countFilters,
             int limit,
-            long offset
+            long offset,
+            String orderBy,
+            String fallbackOrderBy,
+            String p2gMode
     ) {
+        boolean useP2gAll = "all".equalsIgnoreCase(p2gMode);
         String dataDomain = domain;
+        if (useP2gAll) {
+            return selectP2gFallbackRows(
+                    datasetId,
+                    dataDomain,
+                    targetGene,
+                    peakFilter,
+                    contextCellType,
+                    contextCluster,
+                    minP2gScore,
+                    limit,
+                    offset,
+                    fallbackOrderBy
+            );
+        }
         RegulatoryAnnotationCountCache.CountResult countResult = cachedCount(
                 AnnotationType.LINKED_REGION,
                 datasetId,
                 dataDomain,
                 countFilters,
+                null,
                 () -> regulatoryAnnotationMapper.countLinkedRegions(
                         datasetId,
                         dataDomain,
                         targetGene,
-                        peakPattern,
+                        peakFilter.exactPeak(),
+                        peakFilter.chromosome(),
+                        peakFilter.start(),
+                        peakFilter.end(),
                         contextCellType,
                         contextCluster,
-                        maxFdr,
-                        minLog2fc
+                        minP2gScore
                 )
         );
         long total = countResult.total();
         long countMillis = countResult.countMillis();
         boolean countCacheHit = countResult.cacheHit();
         if (total == 0L || offset >= total) {
-            if (total == 0L && !hasLinkedRegionMaterializedRows(datasetId, dataDomain)) {
-                LOGGER.warn(
-                        "linked_region materialized table is empty; run refresh endpoint. datasetId={} requestedDomain={} dataDomain={}",
-                        datasetId,
-                        domain,
-                        dataDomain
-                );
-            }
             return new PagedRows(dataDomain, total, List.of(), countMillis, 0L, 0L, "materialized_linked_region", countCacheHit);
         }
         long pageStartedAt = System.nanoTime();
@@ -428,11 +693,14 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                 datasetId,
                 dataDomain,
                 targetGene,
-                peakPattern,
+                peakFilter.exactPeak(),
+                peakFilter.chromosome(),
+                peakFilter.start(),
+                peakFilter.end(),
                 contextCellType,
                 contextCluster,
-                maxFdr,
-                minLog2fc,
+                minP2gScore,
+                orderBy,
                 limit,
                 intOffset(offset)
         );
@@ -452,15 +720,17 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
         );
     }
 
-    private void mergeMarkerPeakLinkSummaries(String datasetId, String dataDomain, List<RegulatoryAnnotationRow> rows) {
+    private void mergeMarkerPeakLinkSummaries(String datasetId, String dataDomain, String targetGene, List<RegulatoryAnnotationRow> rows) {
         if (rows == null || rows.isEmpty()) {
             return;
         }
 
+        String normalizedGene = targetGene != null ? targetGene.toUpperCase().trim() : null;
         List<RegulatoryAnnotationRow> linkSummaries = regulatoryAnnotationMapper.selectMarkerPeakLinkSummaries(
                 datasetId,
                 dataDomain,
-                rows
+                rows,
+                normalizedGene
         );
         if (linkSummaries == null || linkSummaries.isEmpty()) {
             return;
@@ -486,8 +756,60 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
         }
     }
 
-    private boolean hasLinkedRegionMaterializedRows(String datasetId, String dataDomain) {
-        return regulatoryAnnotationMapper.existsLinkedRegionMaterializedRows(datasetId, dataDomain) == 1;
+    private PagedRows selectP2gFallbackRows(
+            String datasetId,
+            String domain,
+            String targetGene,
+            PeakSearchFilter peakFilter,
+            String contextCellType,
+            String contextCluster,
+            Double minP2gScore,
+            int limit,
+            long offset,
+            String orderBy
+    ) {
+        long countStartedAt = System.nanoTime();
+        String dataDomain = domain;
+        String normalizedGene = targetGene != null ? targetGene.toUpperCase().trim() : null;
+        long total = regulatoryAnnotationMapper.countP2gDirect(
+                datasetId,
+                dataDomain,
+                normalizedGene,
+                peakFilter.exactPeak(),
+                peakFilter.chromosome(),
+                peakFilter.start(),
+                peakFilter.end(),
+                contextCellType,
+                contextCluster,
+                minP2gScore
+        );
+        long countMillis = (System.nanoTime() - countStartedAt) / 1_000_000;
+
+        if (total == 0L || offset >= total) {
+            return new PagedRows(dataDomain, total, List.of(), countMillis, 0L, 0L, "p2g_fallback", false);
+        }
+        long pageStartedAt = System.nanoTime();
+        List<Long> pageIds = regulatoryAnnotationMapper.selectP2gDirectPageIds(
+                datasetId,
+                dataDomain,
+                normalizedGene,
+                peakFilter.exactPeak(),
+                peakFilter.chromosome(),
+                peakFilter.start(),
+                peakFilter.end(),
+                contextCellType,
+                contextCluster,
+                minP2gScore,
+                orderBy,
+                limit,
+                (int) offset
+        );
+        if (pageIds == null || pageIds.isEmpty()) {
+            return new PagedRows(dataDomain, total, List.of(), countMillis, (System.nanoTime() - pageStartedAt) / 1_000_000, 0L, "p2g_fallback", false);
+        }
+        List<RegulatoryAnnotationRow> rows = regulatoryAnnotationMapper.selectP2gDirectByIds(pageIds);
+        return new PagedRows(dataDomain, total, rows, countMillis,
+                (System.nanoTime() - pageStartedAt) / 1_000_000, 0L, "p2g_fallback", false);
     }
 
     private RegulatoryAnnotationCountCache.CountResult cachedCount(
@@ -495,6 +817,7 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
             String datasetId,
             String dataDomain,
             CountFilters filters,
+            String signalType,
             java.util.function.LongSupplier loader
     ) {
         return countCache.getOrLoad(
@@ -508,7 +831,9 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                         filters.contextCluster(),
                         filters.regionType(),
                         filters.maxFdr(),
-                        filters.minLog2fc()
+                        filters.minLog2fc(),
+                        filters.minP2gScore(),
+                        signalType
                 ),
                 loader
         );
@@ -532,25 +857,29 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
             return null;
         }
 
+        Long normalizedGeneStart = normStart(row.getGeneStart(), row.getGeneEnd());
+        Long normalizedGeneEnd = normEnd(row.getGeneStart(), row.getGeneEnd());
+
         PromoterRegion promoter = calculatePromoterRegion(
                 row.getGeneChromosome(),
-                row.getGeneStart(),
-                row.getGeneEnd(),
+                normalizedGeneStart,
+                normalizedGeneEnd,
                 row.getStrand()
         );
         String normalizedStrand = normalizeStrand(row.getStrand());
-        String geneRegion = regionString(row.getGeneChromosome(), row.getGeneStart(), row.getGeneEnd());
+        String geneRegion = regionString(row.getGeneChromosome(), normalizedGeneStart, normalizedGeneEnd);
         String promoterRegion = regionString(promoter.chromosome(), promoter.start(), promoter.end());
 
         RegulatoryAnnotationRecord record = baseRecord(row, AnnotationType.MARKER_GENE.value());
+        record.setSignalType(trimToEmpty(row.getSignalType()));
         record.setId("marker-gene-" + row.getMarkerGeneId());
         record.setTargetGene(gene);
         record.setGeneSymbol(gene);
         record.setGene(gene);
         record.setGeneId(trimToEmpty(row.getGeneId()));
         record.setGeneChromosome(trimToEmpty(row.getGeneChromosome()));
-        record.setGeneStart(row.getGeneStart());
-        record.setGeneEnd(row.getGeneEnd());
+        record.setGeneStart(normalizedGeneStart);
+        record.setGeneEnd(normalizedGeneEnd);
         record.setGeneRegion(geneRegion);
         record.setStrand(normalizedStrand);
         record.setPromoterRegion(promoterRegion);
@@ -578,7 +907,7 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
 
     private RegulatoryAnnotationRecord toMarkerPeakRecord(RegulatoryAnnotationRow row, RegionFilter requestedRegionType) {
         String peakRegion = regionString(row.getPeakChromosome(), row.getPeakStart(), row.getPeakEnd());
-        String peakName = firstNonBlank(row.getPeakName(), peakRegion);
+        String peakName = firstNonBlank(peakRegion, row.getPeakName());
         String linkedGene = trimToEmpty(row.getLinkedGeneName());
         String outputRegionType = peakRegionType(row, requestedRegionType);
 
@@ -586,11 +915,11 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
         record.setId(markerPeakId(row));
         record.setTargetGene(linkedGene);
         record.setPeakName(peakName);
-        record.setPeak(trimToEmpty(row.getPeakName()));
+        record.setPeak(peakName);
         record.setPeakId(peakName);
         record.setPeakChromosome(trimToEmpty(row.getPeakChromosome()));
-        record.setPeakStart(row.getPeakStart());
-        record.setPeakEnd(row.getPeakEnd());
+        record.setPeakStart(normStart(row.getPeakStart(), row.getPeakEnd()));
+        record.setPeakEnd(normEnd(row.getPeakStart(), row.getPeakEnd()));
         record.setPeakRegion(peakRegion);
         record.setPeakLog2fc(row.getPeakLog2fc());
         record.setPeakFdr(row.getPeakFdr());
@@ -603,8 +932,8 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
         record.setRegionType(outputRegionType);
         record.setRegulatoryRegion(peakRegion);
         record.setChromosome(trimToEmpty(row.getPeakChromosome()));
-        record.setStart(row.getPeakStart());
-        record.setEnd(row.getPeakEnd());
+        record.setStart(normStart(row.getPeakStart(), row.getPeakEnd()));
+        record.setEnd(normEnd(row.getPeakStart(), row.getPeakEnd()));
         record.setRegion(peakRegion);
         record.setLog2fc(row.getPeakLog2fc());
         record.setLogFc(row.getPeakLog2fc());
@@ -622,11 +951,14 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
             return null;
         }
 
-        String geneRegion = regionString(row.getGeneChromosome(), row.getGeneStart(), row.getGeneEnd());
+        Long normalizedGeneStart = normStart(row.getGeneStart(), row.getGeneEnd());
+        Long normalizedGeneEnd = normEnd(row.getGeneStart(), row.getGeneEnd());
+
+        String geneRegion = regionString(row.getGeneChromosome(), normalizedGeneStart, normalizedGeneEnd);
         PromoterRegion promoter = calculatePromoterRegion(
                 row.getGeneChromosome(),
-                row.getGeneStart(),
-                row.getGeneEnd(),
+                normalizedGeneStart,
+                normalizedGeneEnd,
                 row.getStrand()
         );
         String normalizedStrand = normalizeStrand(row.getStrand());
@@ -635,8 +967,8 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                 row.getPeakRegion(),
                 regionString(row.getPeakChromosome(), row.getPeakStart(), row.getPeakEnd())
         );
-        String peakName = trimToEmpty(row.getPeakName());
-        String linkedPeak = firstNonBlank(row.getPeakName(), peakRegion);
+        String peakName = firstNonBlank(peakRegion, trimToEmpty(row.getPeakName()));
+        String linkedPeak = firstNonBlank(peakRegion, row.getPeakName());
         boolean hasMarkerPeak = row.getMarkerPeakId() != null;
 
         RegulatoryAnnotationRecord record = baseRecord(row, AnnotationType.LINKED_REGION.value());
@@ -650,8 +982,8 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
         record.setGene(gene);
         record.setGeneId(trimToEmpty(row.getGeneId()));
         record.setGeneChromosome(trimToEmpty(row.getGeneChromosome()));
-        record.setGeneStart(row.getGeneStart());
-        record.setGeneEnd(row.getGeneEnd());
+        record.setGeneStart(normalizedGeneStart);
+        record.setGeneEnd(normalizedGeneEnd);
         record.setGeneRegion(geneRegion);
         record.setStrand(normalizedStrand);
         record.setPromoterRegion(promoterRegion);
@@ -659,11 +991,11 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
         record.setGeneFdr(row.getGeneFdr());
         record.setGeneMeanDiff(row.getGeneMeanDiff());
         record.setPeakName(peakName);
-        record.setPeak(trimToEmpty(row.getPeakName()));
+        record.setPeak(peakName);
         record.setPeakId(linkedPeak);
         record.setPeakChromosome(trimToEmpty(row.getPeakChromosome()));
-        record.setPeakStart(row.getPeakStart());
-        record.setPeakEnd(row.getPeakEnd());
+        record.setPeakStart(normStart(row.getPeakStart(), row.getPeakEnd()));
+        record.setPeakEnd(normEnd(row.getPeakStart(), row.getPeakEnd()));
         record.setPeakRegion(peakRegion);
         record.setPeakLog2fc(row.getPeakLog2fc());
         record.setPeakFdr(row.getPeakFdr());
@@ -673,11 +1005,14 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
         record.setLinkScore(row.getLinkScore());
         record.setCorrelation(row.getCorrelation());
         record.setLinkFdr(row.getLinkFdr());
-        record.setDistance(distanceToTss(row));
+        record.setSignalType(trimToNull(row.getSignalType()));
+        record.setVarQrna(row.getVarQrna());
+        record.setVarQatac(row.getVarQatac());
+        record.setDistance(distanceToTss(normalizedGeneStart, normalizedGeneEnd, row));
         record.setRegulatoryRegion(peakRegion);
         record.setChromosome(trimToEmpty(row.getPeakChromosome()));
-        record.setStart(row.getPeakStart());
-        record.setEnd(row.getPeakEnd());
+        record.setStart(normStart(row.getPeakStart(), row.getPeakEnd()));
+        record.setEnd(normEnd(row.getPeakStart(), row.getPeakEnd()));
         record.setRegion(peakRegion);
         record.setFdr(row.getLinkFdr());
         record.setSource(firstNonBlank(row.getLinkSource(), hasMarkerPeak
@@ -689,7 +1024,9 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
 
     private RegulatoryAnnotationRecord baseRecord(RegulatoryAnnotationRow row, String annotationType) {
         String clusterLabel = firstNonBlank(row.getClusterLabel(), row.getGroupName());
-        String cellType = trimToNull(row.getCellType());
+        String cellType = "integration".equalsIgnoreCase(trimToEmpty(row.getDomain()))
+                ? trimToNull(row.getCellType())
+                : null;
         String context = cellType == null
                 ? clusterLabel
                 : (trimToNull(clusterLabel) == null ? cellType : cellType + " (" + clusterLabel + ")");
@@ -737,19 +1074,18 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
     private FilterPatterns buildFilterPatterns(AnnotationType annotationType, String targetGene, String peak, String contextCellType, String contextCluster) {
         String normalizedTargetGene = exactGeneSymbol(targetGene);
         String normalizedPeak = trimToNull(peak);
-        String peakPattern = likePattern(normalizedPeak);
 
         if (annotationType == AnnotationType.MARKER_PEAK && sameSearchTerm(targetGene, normalizedPeak)) {
             if (isGenomicRegionSearch(normalizedPeak)) {
                 normalizedTargetGene = null;
             } else {
-                peakPattern = null;
+                normalizedPeak = null;
             }
         }
 
         return new FilterPatterns(
                 normalizedTargetGene,
-                peakPattern,
+                normalizedPeak,
                 trimToNull(contextCellType),
                 trimToNull(contextCluster)
         );
@@ -807,33 +1143,58 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
         return groupName;
     }
 
-    private List<RegulatoryAnnotationContextOption> normalizeContextOptions(List<RegulatoryAnnotationContextOption> rawOptions) {
+    private List<RegulatoryAnnotationContextOption> normalizeContextOptions(
+            List<RegulatoryAnnotationContextOption> rawOptions,
+            String domain
+    ) {
         if (rawOptions == null || rawOptions.isEmpty()) {
             return List.of();
         }
 
-        List<RegulatoryAnnotationContextOption> options = new ArrayList<>();
+        boolean includeCellType = "integration".equals(domain);
+        Map<String, RegulatoryAnnotationContextOption> optionByValue = new LinkedHashMap<>();
         for (RegulatoryAnnotationContextOption rawOption : rawOptions) {
             if (rawOption == null) {
                 continue;
             }
 
-            String cellType = trimToNull(rawOption.getCellType());
+            String cellType = includeCellType
+                    ? trimToNull(rawOption.getCellType())
+                    : null;
             String cluster = trimToNull(rawOption.getCluster());
             String label = contextOptionLabel(cellType, cluster);
             if (label == null) {
                 continue;
             }
 
-            RegulatoryAnnotationContextOption option = new RegulatoryAnnotationContextOption();
-            option.setCellType(cellType);
-            option.setCluster(cluster);
-            option.setLabel(label);
-            option.setValue(contextOptionValue(cellType, cluster));
-            option.setCount(rawOption.getCount());
-            options.add(option);
+            String value = contextOptionValue(cellType, cluster);
+            RegulatoryAnnotationContextOption option = optionByValue.computeIfAbsent(value, ignored -> {
+                RegulatoryAnnotationContextOption created = new RegulatoryAnnotationContextOption();
+                created.setCellType(cellType);
+                created.setCluster(cluster);
+                created.setLabel(label);
+                created.setValue(value);
+                created.setCount(0L);
+                return created;
+            });
+            option.setCount(safeCount(option.getCount()) + safeCount(rawOption.getCount()));
         }
-        return options;
+        return new ArrayList<>(optionByValue.values());
+    }
+
+    private void prepareRowCellTypes(List<RegulatoryAnnotationRow> rows, String domain) {
+        if (rows == null || rows.isEmpty()) {
+            return;
+        }
+        if ("integration".equals(domain)) {
+            rows.forEach(row -> row.setCellType(trimToNull(row.getCellType())));
+            return;
+        }
+        rows.forEach(row -> row.setCellType(null));
+    }
+
+    private long safeCount(Long value) {
+        return value == null ? 0L : value;
     }
 
     private String contextOptionLabel(String cellType, String cluster) {
@@ -873,20 +1234,13 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
             return new PromoterRegion(normalizedChromosome, null, null);
         }
 
-        long promoterStart;
-        long promoterEnd;
-        if (minusStrand) {
-            promoterStart = subtractToZero(tss, 500L);
-            promoterEnd = addSafely(tss, 2000L);
-        } else {
-            promoterStart = subtractToZero(tss, 2000L);
-            promoterEnd = addSafely(tss, 500L);
-        }
+        long promoterStart = subtractToZero(tss, 2000L);
+        long promoterEnd = addSafely(tss, 2000L);
         return new PromoterRegion(normalizedChromosome, promoterStart, promoterEnd);
     }
 
-    private Long distanceToTss(RegulatoryAnnotationRow row) {
-        Long tss = "-".equals(normalizeStrand(row.getStrand())) ? row.getGeneEnd() : row.getGeneStart();
+    private Long distanceToTss(Long normalizedGeneStart, Long normalizedGeneEnd, RegulatoryAnnotationRow row) {
+        Long tss = "-".equals(normalizeStrand(row.getStrand())) ? normalizedGeneEnd : normalizedGeneStart;
         Long peakStart = row.getPeakStart();
         Long peakEnd = row.getPeakEnd();
         if (tss == null || peakStart == null || peakEnd == null) {
@@ -962,6 +1316,133 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "domain must be integration, rna, or atac");
     }
 
+    /** Accept "gene_score" or "gene_expression" / "gene_exp"; null/other → null (no filter). */
+    private String normalizeContextCellType(String domain, String contextCellType) {
+        String normalized = trimToNull(contextCellType);
+        if (normalized != null && !"integration".equals(domain)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "contextCellType is only available for domain=integration; use contextCluster for rna/atac"
+            );
+        }
+        return normalized;
+    }
+
+    private String normalizeSignalType(String signalType) {
+        String v = trimToNull(signalType);
+        if (v == null) return null;
+        if ("gene_score".equals(v)) return "gene_score";
+        if ("gene_exp".equals(v) || "gene_expression".equals(v)) return "gene_expression";
+        return null;
+    }
+
+    /**
+     * Converts user-facing sort keys into fixed SQL fragments. No request value is
+     * interpolated directly into SQL; only these whitelisted expressions reach MyBatis.
+     */
+    private String normalizeAnnotationOrderBy(
+            AnnotationType annotationType,
+            String sortBy,
+            String sortOrder,
+            boolean p2gFallback
+    ) {
+        String key = trimToNull(sortBy);
+        if (key == null) {
+            return null;
+        }
+        String normalizedOrder = trimToNull(sortOrder);
+        if (normalizedOrder == null
+                || !("asc".equalsIgnoreCase(normalizedOrder) || "desc".equalsIgnoreCase(normalizedOrder))) {
+            return null;
+        }
+        String direction = "desc".equalsIgnoreCase(normalizedOrder) ? "DESC" : "ASC";
+
+        if (annotationType == AnnotationType.MARKER_GENE) {
+            return switch (key) {
+                case "targetGene" -> textOrder("mg.gene_symbol", direction, "mg.group_name ASC, mg.id ASC");
+                case "context" -> textOrder(
+                        "COALESCE(NULLIF(TRIM(ca.major_cell_type), ''), NULLIF(TRIM(mg.group_name), ''))",
+                        direction,
+                        "mg.group_name " + direction + ", mg.gene_symbol ASC, mg.id ASC");
+                case "geneRegion" -> genomicOrder(
+                        "mg.chromosome", "mg.gene_start", "mg.gene_end", direction, "mg.id ASC");
+                case "promoterRegion" -> genomicOrder(
+                        "mg.chromosome",
+                        "CASE WHEN TRIM(mg.strand) = '-' THEN mg.gene_end ELSE mg.gene_start END",
+                        "CASE WHEN TRIM(mg.strand) = '-' THEN mg.gene_end ELSE mg.gene_start END",
+                        direction,
+                        "mg.id ASC");
+                case "geneLog2fc" -> numericOrder("mg.avg_log2fc", direction, "mg.gene_symbol ASC, mg.id ASC");
+                case "geneFdr" -> numericOrder("mg.fdr", direction, "mg.gene_symbol ASC, mg.id ASC");
+                case "geneMeanDiff" -> numericOrder("mg.mean_diff", direction, "mg.gene_symbol ASC, mg.id ASC");
+                default -> null;
+            };
+        }
+
+        if (annotationType == AnnotationType.MARKER_PEAK) {
+            return switch (key) {
+                case "peakLog2fc" -> numericOrder("mp.log2fc", direction, "mp.chromosome ASC, mp.peak_start ASC, mp.id ASC");
+                case "peakFdr" -> numericOrder("mp.fdr", direction, "mp.chromosome ASC, mp.peak_start ASC, mp.id ASC");
+                case "peakMeanDiff" -> numericOrder("mp.mean_diff", direction, "mp.chromosome ASC, mp.peak_start ASC, mp.id ASC");
+                default -> null;
+            };
+        }
+
+        if (annotationType == AnnotationType.LINKED_REGION) {
+            return switch (key) {
+                case "linkScore" -> p2gFallback
+                        ? numericOrder("COALESCE(p.link_score, ABS(p.correlation), 0)", direction, "p.id ASC")
+                        : numericOrder("mlr.link_score", direction, "mlr.peak_start ASC, mlr.id ASC");
+                case "geneEvidence" -> p2gFallback
+                        ? textOrder("p.gene_name", direction, "p.id ASC")
+                        : numericOrder("mlr.gene_log2fc", direction, "mlr.gene_symbol ASC, mlr.id ASC");
+                case "peakEvidence" -> p2gFallback
+                        ? numericOrder("COALESCE(p.link_score, ABS(p.correlation), 0)", direction, "p.id ASC")
+                        : numericOrder("mlr.peak_log2fc", direction, "mlr.peak_start ASC, mlr.id ASC");
+                default -> null;
+            };
+        }
+
+        return null;
+    }
+
+    private String numericOrder(String expression, String direction, String tieBreakers) {
+        return "(" + expression + " IS NULL) ASC, " + expression + " " + direction + ", " + tieBreakers;
+    }
+
+    private String textOrder(String expression, String direction, String tieBreakers) {
+        return "(" + expression + " IS NULL OR " + expression + " = '') ASC, "
+                + expression + " " + direction + ", " + tieBreakers;
+    }
+
+    private String genomicOrder(
+            String chromosomeExpression,
+            String startExpression,
+            String endExpression,
+            String direction,
+            String tieBreakers
+    ) {
+        return "(" + chromosomeExpression + " IS NULL OR " + chromosomeExpression + " = '') ASC, "
+                + chromosomeRankExpression(chromosomeExpression) + " " + direction + ", "
+                + chromosomeExpression + " " + direction + ", "
+                + startExpression + " " + direction + ", "
+                + endExpression + " " + direction + ", "
+                + tieBreakers;
+    }
+
+    private String chromosomeRankExpression(String chromosomeExpression) {
+        StringBuilder expression = new StringBuilder("CASE LOWER(TRIM(")
+                .append(chromosomeExpression)
+                .append(")) ");
+        for (int chromosome = 1; chromosome <= 22; chromosome++) {
+            expression.append("WHEN 'chr").append(chromosome).append("' THEN ").append(chromosome).append(' ');
+        }
+        return expression
+                .append("WHEN 'chrx' THEN 23 WHEN 'chry' THEN 24 ")
+                .append("WHEN 'chrm' THEN 25 WHEN 'chrmt' THEN 25 ELSE 100 END")
+                .toString();
+    }
+
     private AnnotationType normalizeAnnotationType(String annotationType, String domain) {
         String normalized = trimToNull(annotationType);
         if (normalized == null) {
@@ -1020,6 +1501,13 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
         return Math.max(0.0d, minLog2fc);
     }
 
+    private Double normalizeMinimumScore(Double minScore) {
+        if (minScore == null || !Double.isFinite(minScore)) {
+            return null;
+        }
+        return Math.max(0.0d, minScore);
+    }
+
     private Double normalizeOptionalDouble(Double value) {
         if (value == null || !Double.isFinite(value)) {
             return null;
@@ -1040,19 +1528,52 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
         return new RegulatoryAnnotationResponse(0L, page, pageSize, List.of());
     }
 
-    private String likePattern(String value) {
-        String normalized = trimToNull(value);
-        return normalized == null ? null : "%" + normalized + "%";
-    }
-
     private String exactGeneSymbol(String value) {
         String normalized = trimToNull(value);
         return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
     }
 
+    private PeakSearchFilter parsePeakSearchFilter(String value) {
+        String normalized = trimToNull(value);
+        if (normalized == null) {
+            return PeakSearchFilter.empty();
+        }
+
+        Matcher matcher = PEAK_REGION_PATTERN.matcher(normalized);
+        if (!matcher.matches()) {
+            return PeakSearchFilter.exact(normalized);
+        }
+
+        try {
+            String chromosome = normalizeChromosome(matcher.group(1));
+            long start = Long.parseLong(matcher.group(2).replace(",", ""));
+            long end = Long.parseLong(matcher.group(3).replace(",", ""));
+            if (start >= end) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Region start must be smaller than region end."
+                );
+            }
+            return PeakSearchFilter.overlap(chromosome, start, end);
+        } catch (NumberFormatException invalidCoordinate) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Region coordinates are outside the supported integer range."
+            );
+        }
+    }
+
     private boolean isGenomicRegionSearch(String value) {
         String normalized = trimToNull(value);
         return normalized != null && normalized.replace(",", "").matches("(?i)^chr[^:]+:\\d+(-\\d+)?$");
+    }
+
+    private String normalizeChromosome(String value) {
+        String normalized = trimToNull(value);
+        if (normalized == null || normalized.length() < 3 || !normalized.regionMatches(true, 0, "chr", 0, 3)) {
+            return normalized;
+        }
+        return "chr" + normalized.substring(3);
     }
 
     private boolean sameSearchTerm(String first, String second) {
@@ -1144,7 +1665,19 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
         if (normalizedChromosome == null || start == null || end == null) {
             return "";
         }
-        return normalizedChromosome + ":" + start + "-" + end;
+        long s = start, e = end;
+        if (s > e) { long t = s; s = e; e = t; }
+        return normalizedChromosome + ":" + s + "-" + e;
+    }
+
+    private static Long normStart(Long start, Long end) {
+        if (start == null || end == null) return start;
+        return start > end ? end : start;
+    }
+
+    private static Long normEnd(Long start, Long end) {
+        if (start == null || end == null) return end;
+        return start > end ? start : end;
     }
 
     private String peakFeatureId(String chromosome, Long start, Long end) {
@@ -1198,7 +1731,7 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
 
     private record FilterPatterns(
             String targetGene,
-            String peakPattern,
+            String peakQuery,
             String contextCellType,
             String contextCluster
     ) {
@@ -1211,8 +1744,41 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
             String contextCluster,
             String regionType,
             Double maxFdr,
-            Double minLog2fc
+            Double minLog2fc,
+            Double minP2gScore
     ) {
+    }
+
+    private record PeakSearchFilter(
+            String exactPeak,
+            String chromosome,
+            Long start,
+            Long end,
+            String cacheKey
+    ) {
+        private static PeakSearchFilter empty() {
+            return new PeakSearchFilter(null, null, null, null, null);
+        }
+
+        private static PeakSearchFilter exact(String peak) {
+            return new PeakSearchFilter(
+                    peak,
+                    null,
+                    null,
+                    null,
+                    "exact:" + peak.toLowerCase(Locale.ROOT)
+            );
+        }
+
+        private static PeakSearchFilter overlap(String chromosome, long start, long end) {
+            return new PeakSearchFilter(
+                    null,
+                    chromosome,
+                    start,
+                    end,
+                    "overlap:" + chromosome.toLowerCase(Locale.ROOT) + ":" + start + "-" + end
+            );
+        }
     }
 
     private record PromoterRegion(String chromosome, Long start, Long end) {

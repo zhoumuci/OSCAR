@@ -27,6 +27,31 @@ public interface SearchResultMapper {
             )
             """;
 
+    /* Shared JOIN to oscar_cluster_annotation for domain-aware cluster labels.
+     * clusterRaw is a bare column reference (e.g. c.cluster_wnn), safe for ${}.
+     * domain is a bound param (#{}), safe from SQL injection. */
+    String CLUSTER_ANNOTATION_JOIN = """
+            LEFT JOIN oscar_cluster_annotation ca
+              ON #{domain} = 'integration'
+             AND ca.dataset_id = c.dataset_id
+             AND ca.domain = #{domain}
+             AND ca.cluster_label = ${clusterRaw}
+            """;
+
+    /* Integration may display its WNN cell type together with the WNN cluster.
+     * RNA and ATAC have no independent cell-type annotation, so their labels
+     * must contain only the modality-specific cluster. */
+    String DOMAIN_CLUSTER_LABEL_EXPR = """
+            CASE
+                WHEN #{domain} = 'integration' THEN CONCAT(
+                    COALESCE(NULLIF(TRIM(ca.major_cell_type), ''), 'Unannotated'),
+                    ' / ',
+                    COALESCE(NULLIF(TRIM(${clusterExpr}), ''), 'Unknown')
+                )
+                ELSE COALESCE(NULLIF(TRIM(${clusterExpr}), ''), 'Unknown')
+            END
+            """;
+
     @Select("""
             SELECT COUNT(*)
             FROM oscar_sample
@@ -35,17 +60,6 @@ public interface SearchResultMapper {
               AND (is_visible IS NULL OR is_visible = 1)
             """)
     long countVisibleSampleByDatasetId(@Param("datasetId") String datasetId);
-
-    @Select("""
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_schema = DATABASE()
-              AND table_name = 'oscar_cell_profile'
-              AND column_name IN ('domain', 'view_type', 'modality')
-            ORDER BY FIELD(column_name, 'domain', 'view_type', 'modality')
-            LIMIT 1
-            """)
-    String selectCellProfileDomainColumn();
 
     @Select("""
             SELECT
@@ -73,9 +87,8 @@ public interface SearchResultMapper {
     SearchResultOverviewResponse selectOverviewByDatasetId(@Param("datasetId") String datasetId);
 
     /*
-     * SearchResult is sample-detail level. dataset_id is the business key and
-     * oscar_cell_profile is used only for detail charts, not Browse table logic.
-     * Dynamic column values are internal whitelist outputs.
+     * Cell type composition (donut chart): groups by domain-aware cluster column
+     * and joins oscar_cluster_annotation for major_cell_type labelling.
      */
     @Select({
             "<script>",
@@ -85,14 +98,13 @@ public interface SearchResultMapper {
             "    grouped.cellCount / NULLIF(SUM(grouped.cellCount) OVER (), 0) AS ratio",
             "FROM (",
             "    SELECT",
-            "        COALESCE(NULLIF(TRIM(${groupColumn}), ''), 'Unknown') AS label,",
+            "        " + DOMAIN_CLUSTER_LABEL_EXPR + " AS label,",
             "        COUNT(*) AS cellCount",
             "    FROM oscar_cell_profile c",
+            CLUSTER_ANNOTATION_JOIN,
             "    WHERE " + CELL_VISIBLE_FILTER,
-            "<if test='domainColumn != null'>",
-            "      AND LOWER(TRIM(${domainColumn})) = #{domain}",
-            "</if>",
-            "    GROUP BY COALESCE(NULLIF(TRIM(${groupColumn}), ''), 'Unknown')",
+            "      AND ${clusterExpr} IS NOT NULL",
+            "    GROUP BY " + DOMAIN_CLUSTER_LABEL_EXPR,
             ") grouped",
             "ORDER BY grouped.cellCount DESC, grouped.label ASC",
             "</script>"
@@ -100,8 +112,8 @@ public interface SearchResultMapper {
     List<SearchResultCellTypeItemResponse> selectCellTypeComposition(
             @Param("datasetId") String datasetId,
             @Param("domain") String domain,
-            @Param("domainColumn") String domainColumn,
-            @Param("groupColumn") String groupColumn
+            @Param("clusterRaw") String clusterRaw,
+            @Param("clusterExpr") String clusterExpr
     );
 
     @Select({
@@ -109,35 +121,31 @@ public interface SearchResultMapper {
             "SELECT COUNT(*)",
             "FROM oscar_cell_profile c",
             "WHERE " + CELL_VISIBLE_FILTER,
-            "<if test='domainColumn != null'>",
-            "  AND LOWER(TRIM(${domainColumn})) = #{domain}",
-            "</if>",
             "  AND ${xColumn} IS NOT NULL",
             "  AND ${yColumn} IS NOT NULL",
             "</script>"
     })
     long countScatterPoints(
             @Param("datasetId") String datasetId,
-            @Param("domain") String domain,
-            @Param("domainColumn") String domainColumn,
             @Param("xColumn") String xColumn,
             @Param("yColumn") String yColumn
     );
 
+    /* Cluster scatter. Only integration may attach its WNN cell-type annotation. */
     @Select({
             "<script>",
             "SELECT",
             "    c.barcode,",
             "    ${xColumn} AS x,",
             "    ${yColumn} AS y,",
-            "    COALESCE(NULLIF(TRIM(${colorColumn}), ''), 'Unknown') AS label,",
-            "    COALESCE(NULLIF(TRIM(c.cell_type), ''), 'Unknown') AS celltype,",
-            "    COALESCE(NULLIF(TRIM(c.cluster_label), ''), 'Unknown') AS cluster",
+            "    " + DOMAIN_CLUSTER_LABEL_EXPR + " AS label,",
+            "    CASE WHEN #{domain} = 'integration'",
+            "         THEN COALESCE(NULLIF(TRIM(c.cell_type), ''), 'Unknown')",
+            "         ELSE NULL END AS celltype,",
+            "    COALESCE(NULLIF(TRIM(${clusterExpr}), ''), 'Unknown') AS cluster",
             "FROM oscar_cell_profile c",
+            CLUSTER_ANNOTATION_JOIN,
             "WHERE " + CELL_VISIBLE_FILTER,
-            "<if test='domainColumn != null'>",
-            "  AND LOWER(TRIM(${domainColumn})) = #{domain}",
-            "</if>",
             "  AND ${xColumn} IS NOT NULL",
             "  AND ${yColumn} IS NOT NULL",
             "<if test='samplingModulo != null and samplingModulo &gt; 1'>",
@@ -150,10 +158,40 @@ public interface SearchResultMapper {
     List<SearchResultUmapPointResponse> selectSampledScatterPoints(
             @Param("datasetId") String datasetId,
             @Param("domain") String domain,
-            @Param("domainColumn") String domainColumn,
             @Param("xColumn") String xColumn,
             @Param("yColumn") String yColumn,
-            @Param("colorColumn") String colorColumn,
+            @Param("clusterExpr") String clusterExpr,
+            @Param("clusterRaw") String clusterRaw,
+            @Param("samplingModulo") Integer samplingModulo,
+            @Param("maxPoints") Integer maxPoints
+    );
+
+    /* Lightweight scatter (colorBy=cell_type, domain=integration only — no annotation JOIN) */
+    @Select({
+            "<script>",
+            "SELECT",
+            "    c.barcode,",
+            "    ${xColumn} AS x,",
+            "    ${yColumn} AS y,",
+            "    COALESCE(NULLIF(TRIM(c.cell_type), ''), 'Unknown') AS label,",
+            "    COALESCE(NULLIF(TRIM(c.cell_type), ''), 'Unknown') AS celltype,",
+            "    COALESCE(NULLIF(TRIM(${clusterExpr}), ''), 'Unknown') AS cluster",
+            "FROM oscar_cell_profile c",
+            "WHERE " + CELL_VISIBLE_FILTER,
+            "  AND ${xColumn} IS NOT NULL",
+            "  AND ${yColumn} IS NOT NULL",
+            "<if test='samplingModulo != null and samplingModulo &gt; 1'>",
+            "  AND MOD(CRC32(c.barcode), #{samplingModulo}) = 0",
+            "</if>",
+            "ORDER BY CRC32(c.barcode), c.barcode",
+            "LIMIT #{maxPoints}",
+            "</script>"
+    })
+    List<SearchResultUmapPointResponse> selectSampledScatterPointsByCellType(
+            @Param("datasetId") String datasetId,
+            @Param("xColumn") String xColumn,
+            @Param("yColumn") String yColumn,
+            @Param("clusterExpr") String clusterExpr,
             @Param("samplingModulo") Integer samplingModulo,
             @Param("maxPoints") Integer maxPoints
     );
@@ -161,25 +199,87 @@ public interface SearchResultMapper {
     @Select({
             "<script>",
             "SELECT",
-            "    COALESCE(NULLIF(TRIM(${groupColumn}), ''), 'Unknown') AS label,",
+            "    c.barcode,",
+            "    ${xColumn} AS x,",
+            "    ${yColumn} AS y,",
+            "    " + DOMAIN_CLUSTER_LABEL_EXPR + " AS label,",
+            "    CASE WHEN #{domain} = 'integration'",
+            "         THEN COALESCE(NULLIF(TRIM(c.cell_type), ''), 'Unknown')",
+            "         ELSE NULL END AS celltype,",
+            "    COALESCE(NULLIF(TRIM(${clusterExpr}), ''), 'Unknown') AS cluster",
+            "FROM oscar_cell_profile c",
+            CLUSTER_ANNOTATION_JOIN,
+            "WHERE " + CELL_VISIBLE_FILTER,
+            "  AND ${xColumn} IS NOT NULL",
+            "  AND ${yColumn} IS NOT NULL",
+            "<if test='afterBarcode != null'>",
+            "  AND c.barcode &gt; #{afterBarcode}",
+            "</if>",
+            "ORDER BY c.barcode",
+            "LIMIT #{pageSize}",
+            "</script>"
+    })
+    List<SearchResultUmapPointResponse> selectScatterPointsPage(
+            @Param("datasetId") String datasetId,
+            @Param("domain") String domain,
+            @Param("xColumn") String xColumn,
+            @Param("yColumn") String yColumn,
+            @Param("clusterExpr") String clusterExpr,
+            @Param("clusterRaw") String clusterRaw,
+            @Param("afterBarcode") String afterBarcode,
+            @Param("pageSize") Integer pageSize
+    );
+
+    @Select({
+            "<script>",
+            "SELECT",
+            "    c.barcode,",
+            "    ${xColumn} AS x,",
+            "    ${yColumn} AS y,",
+            "    COALESCE(NULLIF(TRIM(c.cell_type), ''), 'Unknown') AS label,",
+            "    COALESCE(NULLIF(TRIM(c.cell_type), ''), 'Unknown') AS celltype,",
+            "    COALESCE(NULLIF(TRIM(${clusterExpr}), ''), 'Unknown') AS cluster",
+            "FROM oscar_cell_profile c",
+            "WHERE " + CELL_VISIBLE_FILTER,
+            "  AND ${xColumn} IS NOT NULL",
+            "  AND ${yColumn} IS NOT NULL",
+            "<if test='afterBarcode != null'>",
+            "  AND c.barcode &gt; #{afterBarcode}",
+            "</if>",
+            "ORDER BY c.barcode",
+            "LIMIT #{pageSize}",
+            "</script>"
+    })
+    List<SearchResultUmapPointResponse> selectScatterPointsPageByCellType(
+            @Param("datasetId") String datasetId,
+            @Param("xColumn") String xColumn,
+            @Param("yColumn") String yColumn,
+            @Param("clusterExpr") String clusterExpr,
+            @Param("afterBarcode") String afterBarcode,
+            @Param("pageSize") Integer pageSize
+    );
+
+    @Select({
+            "<script>",
+            "SELECT",
+            "    " + DOMAIN_CLUSTER_LABEL_EXPR + " AS label,",
             "    COUNT(*) AS count,",
             "    MIN(${metricColumn}) AS min,",
             "    MAX(${metricColumn}) AS max",
             "FROM oscar_cell_profile c",
+            CLUSTER_ANNOTATION_JOIN,
             "WHERE " + CELL_VISIBLE_FILTER,
-            "<if test='domainColumn != null'>",
-            "  AND LOWER(TRIM(${domainColumn})) = #{domain}",
-            "</if>",
             "  AND ${metricColumn} IS NOT NULL",
-            "GROUP BY COALESCE(NULLIF(TRIM(${groupColumn}), ''), 'Unknown')",
+            "  AND ${clusterExpr} IS NOT NULL",
+            "GROUP BY " + DOMAIN_CLUSTER_LABEL_EXPR,
             "ORDER BY count DESC, label ASC",
             "</script>"
     })
     List<SearchResultQcSummaryRow> selectQcSummaryByMetric(
             @Param("datasetId") String datasetId,
             @Param("domain") String domain,
-            @Param("domainColumn") String domainColumn,
-            @Param("groupColumn") String groupColumn,
+            @Param("clusterRaw") String clusterRaw,
+            @Param("clusterExpr") String clusterExpr,
             @Param("metricColumn") String metricColumn
     );
 
@@ -188,18 +288,17 @@ public interface SearchResultMapper {
             "SELECT sampled.label, sampled.value",
             "FROM (",
             "    SELECT",
-            "        COALESCE(NULLIF(TRIM(${groupColumn}), ''), 'Unknown') AS label,",
+            "        " + DOMAIN_CLUSTER_LABEL_EXPR + " AS label,",
             "        ${metricColumn} AS value,",
             "        ROW_NUMBER() OVER (",
-            "            PARTITION BY COALESCE(NULLIF(TRIM(${groupColumn}), ''), 'Unknown')",
+            "            PARTITION BY " + DOMAIN_CLUSTER_LABEL_EXPR,
             "            ORDER BY CRC32(c.barcode), c.barcode",
             "        ) AS rowNumber",
             "    FROM oscar_cell_profile c",
+            CLUSTER_ANNOTATION_JOIN,
             "    WHERE " + CELL_VISIBLE_FILTER,
-            "<if test='domainColumn != null'>",
-            "      AND LOWER(TRIM(${domainColumn})) = #{domain}",
-            "</if>",
             "      AND ${metricColumn} IS NOT NULL",
+            "      AND ${clusterExpr} IS NOT NULL",
             ") sampled",
             "WHERE sampled.rowNumber &lt;= #{maxValuesPerGroup}",
             "ORDER BY sampled.label ASC, sampled.rowNumber ASC",
@@ -208,9 +307,33 @@ public interface SearchResultMapper {
     List<SearchResultQcValueRow> selectQcSampledValuesByMetric(
             @Param("datasetId") String datasetId,
             @Param("domain") String domain,
-            @Param("domainColumn") String domainColumn,
-            @Param("groupColumn") String groupColumn,
+            @Param("clusterRaw") String clusterRaw,
+            @Param("clusterExpr") String clusterExpr,
             @Param("metricColumn") String metricColumn,
             @Param("maxValuesPerGroup") Integer maxValuesPerGroup
     );
+
+    @Select({
+            "<script>",
+            "SELECT",
+            "    " + DOMAIN_CLUSTER_LABEL_EXPR + " AS label,",
+            "    ${metricColumn} AS value",
+            "FROM oscar_cell_profile c",
+            CLUSTER_ANNOTATION_JOIN,
+            "WHERE " + CELL_VISIBLE_FILTER,
+            "  AND ${metricColumn} IS NOT NULL",
+            "  AND ${clusterExpr} IS NOT NULL",
+            "  AND MOD(CRC32(c.barcode), #{samplingModulo}) = 0",
+            "</script>"
+    })
+    List<SearchResultQcValueRow> selectQcSampledValuesByModulo(
+            @Param("datasetId") String datasetId,
+            @Param("domain") String domain,
+            @Param("clusterRaw") String clusterRaw,
+            @Param("clusterExpr") String clusterExpr,
+            @Param("metricColumn") String metricColumn,
+            @Param("samplingModulo") Integer samplingModulo
+    );
+
+    
 }

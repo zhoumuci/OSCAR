@@ -3,11 +3,10 @@
     <div class="section-head">
       <div>
         <div class="section-title">Regulatory network</div>
-        <div class="section-sub">Explore marker-associated direct peak-to-gene links within this sample.</div>
+        <div class="section-sub">Explore direct peak-to-gene links within this sample.</div>
       </div>
 
       <div class="section-tags">
-        <span v-if="demoMode" class="demo-badge">DEMO DATA</span>
         <span class="data-chip" :title="domainTitle">{{ domainChip }}</span>
         <span class="data-chip mono" :title="datasetId">{{ datasetId }}</span>
       </div>
@@ -31,34 +30,20 @@
 
       <div class="query-panel">
         <template v-if="queryMode === 'gene'">
-          <label class="control-field control-field--grow">
+          <label class="control-field control-field--grow" :class="{ 'control-field--invalid': geneQueryError }">
             <span class="control-label">Gene symbol</span>
+            <Transition name="query-error">
+              <span v-if="geneQueryError" class="query-input-error" role="alert" aria-live="polite">{{ geneQueryError }}</span>
+            </Transition>
             <el-input
               v-model="geneQuery"
               class="control-input"
-              placeholder="Enter gene symbol, e.g. CD3D"
+              placeholder="Enter single gene symbol"
               clearable
               size="small"
+              @input="clearQueryInputError('gene')"
               @keyup.enter="searchNetwork"
             />
-          </label>
-
-          <label v-if="showGroupByControl" class="control-field">
-            <span class="control-label">Group by</span>
-            <el-select
-              v-model="groupBy"
-              class="control-input oscar-pill-select"
-              popper-class="oscar-select-popper"
-              size="small"
-              @change="reloadWithGroupBy"
-            >
-              <el-option
-                v-for="option in groupOptions"
-                :key="option.value"
-                :label="option.label"
-                :value="option.value"
-              />
-            </el-select>
           </label>
 
           <label class="control-field">
@@ -76,57 +61,34 @@
         </template>
 
         <template v-else>
-          <label class="control-field control-field--grow">
+          <label class="control-field control-field--grow" :class="{ 'control-field--invalid': peakQueryError }">
             <span class="control-label">Peak region</span>
+            <Transition name="query-error">
+              <span v-if="peakQueryError" class="query-input-error" role="alert" aria-live="polite">{{ peakQueryError }}</span>
+            </Transition>
             <el-input
               v-model="peakQuery"
               class="control-input"
-              placeholder="chr1:10000-10500"
+              placeholder="Enter single peak region"
               clearable
               size="small"
+              @input="clearQueryInputError('peak')"
               @keyup.enter="searchNetwork"
             />
           </label>
 
-          <label class="control-field">
+          <label class="control-field" :class="{ 'control-field--invalid': linkedGeneQueryError }">
             <span class="control-label">Linked gene</span>
+            <Transition name="query-error">
+              <span v-if="linkedGeneQueryError" class="query-input-error" role="alert" aria-live="polite">{{ linkedGeneQueryError }}</span>
+            </Transition>
             <el-input
               v-model="linkedGeneQuery"
               class="control-input"
-              placeholder="Gene symbol"
+              placeholder="Enter single gene symbol"
               clearable
               size="small"
-              @keyup.enter="searchNetwork"
-            />
-          </label>
-
-          <label v-if="showGroupByControl" class="control-field">
-            <span class="control-label">Group by</span>
-            <el-select
-              v-model="groupBy"
-              class="control-input oscar-pill-select"
-              popper-class="oscar-select-popper"
-              size="small"
-              @change="reloadWithGroupBy"
-            >
-              <el-option
-                v-for="option in groupOptions"
-                :key="option.value"
-                :label="option.label"
-                :value="option.value"
-              />
-            </el-select>
-          </label>
-
-          <label class="control-field">
-            <span class="control-label">Max distance to TSS</span>
-            <el-input
-              v-model="peakMaxDistance"
-              class="control-input"
-              placeholder="200000"
-              clearable
-              inputmode="numeric"
-              size="small"
+              @input="clearQueryInputError('linkedGene')"
               @keyup.enter="searchNetwork"
             />
           </label>
@@ -168,16 +130,21 @@
           <div class="graph-heading">
             <span>Network view</span>
             <div v-if="hasGraphData" class="graph-legend" aria-label="Regulatory graph legend">
-              <span class="legend-item"><span class="legend-dot legend-dot--gene"></span>Gene</span>
-              <span class="legend-item"><span class="legend-dot legend-dot--peak"></span>Peak</span>
-              <span v-if="visibleGraph.hasGroupData" class="legend-item">
-                <span class="legend-dot legend-dot--group"></span>Cell type / Cluster
+              <span class="legend-item">
+                <span class="legend-swatches" aria-hidden="true">
+                  <span class="legend-dot legend-dot--gene"></span>
+                  <span class="legend-dot legend-dot--gene-alt"></span>
+                </span>
+                Gene
               </span>
-              <span v-if="hasTfNodes" class="legend-item"><span class="legend-dot legend-dot--tf"></span>TF</span>
+              <span class="legend-item">
+                <span class="legend-swatches" aria-hidden="true">
+                  <span class="legend-dot legend-dot--peak"></span>
+                  <span class="legend-dot legend-dot--peak-alt"></span>
+                </span>
+                Peak
+              </span>
               <span class="legend-item"><span class="legend-line legend-line--peak"></span>Peak-to-gene link</span>
-              <span v-if="visibleGraph.hasGroupData" class="legend-item">
-                <span class="legend-line legend-line--marker"></span>Marker relation
-              </span>
             </div>
           </div>
 
@@ -216,7 +183,11 @@
               <div class="inspector-head">
                 <div class="inspector-heading-copy">
                   <div class="inspector-kicker">Details</div>
-                  <span class="inspector-chip" :class="`inspector-chip--${selectedDetail.kind}`">
+                  <span
+                    class="inspector-chip"
+                    :class="`inspector-chip--${selectedDetail.kind}`"
+                    :style="inspectorChipStyle"
+                  >
                     {{ selectedDetail.chip }}
                   </span>
                 </div>
@@ -331,16 +302,53 @@
         :row-class-name="getLinkRowClassName"
       >
         <el-table-column prop="peak" label="Peak" min-width="190">
-          <template #default="{ row }">{{ displayText(row.peak) }}</template>
+          <template #default="{ row }">
+            <el-popover
+              trigger="click"
+              placement="right-start"
+              :width="380"
+              popper-class="annotation-detail-popper network-peak-detail-popper"
+            >
+              <template #reference>
+                <button type="button" class="network-peak-link">{{ displayText(row.peak) }}</button>
+              </template>
+              <div class="network-peak-card">
+                <div class="network-peak-card-head">
+                  <div class="network-peak-card-head-row">
+                    <div class="network-peak-kicker">Peak detail</div>
+                    <button
+                      type="button"
+                      class="network-peak-detail-button"
+                      :disabled="!canViewPeakDetail(row)"
+                      @click="goToPeakDetail(row)"
+                    >
+                      View peak detail
+                    </button>
+                </div>
+                <div class="network-peak-title">{{ displayText(row.peak) }}</div>
+                <div class="network-peak-pills">
+                    <span class="network-peak-pill">{{ peakDatasetLabel(row) }} / {{ peakDomainLabel(row) }}</span>
+                  </div>
+                </div>
+                <div class="network-peak-card-body">
+                  <div class="network-peak-grid">
+                    <div><span>Feature type</span><strong>Peak / Regulatory region</strong></div>
+                    <div><span>Peak ID</span><strong>{{ displayText(row.peakId) }}</strong></div>
+                    <div class="network-peak-grid-wide"><span>Location</span><strong>{{ displayText(row.peak) }}</strong></div>
+                    <div><span>Linked gene</span><strong>{{ displayText(row.linkedGene) }}</strong></div>
+                  </div>
+                  <div class="network-peak-metrics">
+                    <div><span>Link score</span><strong>{{ formatNumber(row.linkScore ?? row.score) }}</strong></div>
+                    <div><span>Correlation</span><strong>{{ formatNumber(row.correlation) }}</strong></div>
+                    <div><span>FDR</span><strong>{{ formatNumber(row.fdr) }}</strong></div>
+                  </div>
+                </div>
+              </div>
+            </el-popover>
+          </template>
         </el-table-column>
         <el-table-column prop="linkedGene" label="Linked gene" min-width="130">
           <template #default="{ row }">{{ displayText(row.linkedGene) }}</template>
-        </el-table-column>
-        <el-table-column v-if="visibleGraph.hasGroupData" prop="group" label="Group" min-width="150">
-          <template #default="{ row }">{{ displayText(row.group) }}</template>
-        </el-table-column>
-        <el-table-column v-if="visibleGraph.hasGroupData" prop="markerStatus" label="Marker status" min-width="140">
-          <template #default="{ row }">{{ displayText(row.markerStatus) }}</template>
         </el-table-column>
         <el-table-column v-if="hasDistanceValues" label="Distance to TSS" min-width="140" align="center">
           <template #default="{ row }">{{ formatNumber(row.distanceToTss) }}</template>
@@ -394,15 +402,15 @@
       v-model="fullLinksDialogVisible"
       class="full-links-dialog"
       :title="fullLinksDialogTitle"
-      width="min(920px, 80vw)"
+      width="920px"
       destroy-on-close
       @open="loadFullLinks"
     >
       <div class="full-links-toolbar">
         <div class="full-links-subtitle">{{ fullLinksDialogSubtitle }}</div>
-        <el-button class="soft-button" size="small" :disabled="fullLinksItems.length === 0" @click="downloadFullLinksPageCsv">
+        <el-button class="soft-button" size="small" @click="downloadFullLinksAllCsv">
           <el-icon><Download /></el-icon>
-          <span>Download current page</span>
+          <span>Download CSV</span>
         </el-button>
       </div>
 
@@ -418,34 +426,33 @@
         stripe
         border
         class="detail-table full-links-table"
-        max-height="520"
         empty-text="No links found."
       >
-        <el-table-column prop="peak" label="Peak" min-width="220">
+        <el-table-column prop="peak" label="Peak" min-width="280">
           <template #default="{ row }">{{ displayText(row.peak) }}</template>
         </el-table-column>
-        <el-table-column prop="linkedGene" label="Linked gene" min-width="130">
+        <el-table-column prop="linkedGene" label="Linked gene" min-width="160">
           <template #default="{ row }">{{ displayText(row.linkedGene) }}</template>
         </el-table-column>
-        <el-table-column label="Link score" min-width="110" align="center">
+        <el-table-column label="Link score" min-width="120" align="center">
           <template #default="{ row }">{{ formatNumber(row.linkScore ?? row.score) }}</template>
         </el-table-column>
-        <el-table-column label="Correlation" min-width="110" align="center">
+        <el-table-column label="Correlation" min-width="120" align="center">
           <template #default="{ row }">{{ formatNumber(row.correlation) }}</template>
         </el-table-column>
-        <el-table-column v-if="hasFullLinksFdrValues" label="FDR" min-width="100" align="center">
+        <el-table-column v-if="hasFullLinksFdrValues" label="FDR" min-width="110" align="center">
           <template #default="{ row }">{{ formatNumber(row.fdr) }}</template>
         </el-table-column>
-        <el-table-column v-if="hasFullLinksVarQValues" label="VarQ ATAC" min-width="110" align="center">
+        <el-table-column v-if="hasFullLinksVarQValues" label="VarQ ATAC" min-width="120" align="center">
           <template #default="{ row }">{{ formatNumber(row.varQAtac) }}</template>
         </el-table-column>
-        <el-table-column v-if="hasFullLinksVarQValues" label="VarQ RNA" min-width="110" align="center">
+        <el-table-column v-if="hasFullLinksVarQValues" label="VarQ RNA" min-width="120" align="center">
           <template #default="{ row }">{{ formatNumber(row.varQRna) }}</template>
         </el-table-column>
-        <el-table-column v-if="hasFullLinksDatasetValues" prop="datasetId" label="Dataset" min-width="130">
+        <el-table-column v-if="hasFullLinksDatasetValues" prop="datasetId" label="Dataset" min-width="160">
           <template #default="{ row }">{{ displayText(row.datasetId) }}</template>
         </el-table-column>
-        <el-table-column v-if="hasFullLinksSampleValues" prop="sampleName" label="Sample" min-width="130">
+        <el-table-column v-if="hasFullLinksSampleValues" prop="sampleName" label="Sample" min-width="180">
           <template #default="{ row }">{{ displayText(row.sampleName) }}</template>
         </el-table-column>
       </el-table>
@@ -465,21 +472,14 @@
     </el-dialog>
   </section>
 
-  <Teleport to="body">
-    <Transition name="peak-toast-slide">
-      <div v-if="peakHintVisible" class="peak-format-toast">
-        Use <b>chr:start-end</b> format, e.g. <b>chr1:10000-20000</b>
-      </div>
-    </Transition>
-  </Teleport>
 </template>
 
 <script setup lang="ts">
 import { Download, Refresh, Search } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import type {
-  MarkerGeneGroupBy,
   RegulatoryNetworkExpansionResponse,
   RegulatoryNetworkLink,
   RegulatoryNetworkMode,
@@ -494,11 +494,6 @@ import {
   isSearchResultEndpointUnavailable,
 } from "@/api/searchResult";
 import RegulatoryNetworkSvg from "@/components/search-result/RegulatoryNetworkSvg.vue";
-import {
-  getDemoRegulatoryExpansion,
-  getDemoRegulatoryNetwork,
-  type DemoDataSize,
-} from "@/mock/searchResultDemoData";
 import { domainDisplayLabel } from "@/utils/searchResultDomain";
 import type {
   GraphDimensions,
@@ -514,7 +509,6 @@ import {
   createAnchorGraph,
   emptyRegulatoryGraph,
   getGeneNodeId,
-  getGroupLinks,
   getPeakGeneLinksForGene,
   getPeakGeneLinksForPeak,
   getPeakNodeId,
@@ -530,7 +524,7 @@ import {
 } from "@/utils/regulatoryNetworkGraph";
 
 type InspectorActionName = "focusNode" | "expandNeighbors";
-type InspectorKind = "gene" | "peak" | "group" | "tf" | "edge";
+type InspectorKind = "gene" | "peak" | "edge";
 type QueryIntent = "default" | "gene" | "peak";
 type ExpandReason = "auto" | "manual";
 type PeakLabelMode = "overview" | "active" | "hidden";
@@ -566,12 +560,10 @@ type FullLinksAction = {
 const props = withDefaults(defineProps<{
   datasetId: string;
   domain: SearchResultDomain;
-  demoMode?: boolean;
-  demoSize?: DemoDataSize;
 }>(), {
-  demoMode: false,
-  demoSize: "medium",
 });
+const route = useRoute();
+const router = useRouter();
 
 const DEFAULT_GRAPH_DIMENSIONS: GraphDimensions = {
   width: 960,
@@ -583,8 +575,6 @@ const LOCAL_NODE_LINK_LIMIT = 30;
 const MAX_VISIBLE_GRAPH_NODES = 50;
 const NODE_RELATED_STEP = 5;
 const AUTO_RELATED_STEP = 3;
-const GROUP_VISIBLE_GENE_LIMIT = 8;
-const GROUP_PEAK_BUDGET_PER_GENE = 5;
 const NEW_ITEM_FLAG_MS = 820;
 const NO_ADDITIONAL_RELATED_MESSAGE = "No additional related nodes available.";
 const LOCAL_LINK_LIMIT_MESSAGE = "Graph view shows top 30 links. Use View all links to inspect the complete list.";
@@ -595,22 +585,24 @@ const modeOptions: Array<{ value: RegulatoryNetworkMode; label: string }> = [
   { value: "peak", label: "Peak" },
 ];
 
-const groupOptions: Array<{ value: MarkerGeneGroupBy; label: string }> = [
-  { value: "cell_type", label: "Cell type" },
-  { value: "cluster", label: "Cluster" },
-];
-
 const sectionEl = ref<HTMLElement | null>(null);
 const queryMode = ref<RegulatoryNetworkMode>("gene");
-const groupBy = ref<MarkerGeneGroupBy>("cell_type");
 const geneQuery = ref("");
 const geneMinScore = ref("");
 const peakQuery = ref("");
 const linkedGeneQuery = ref("");
-const peakMaxDistance = ref("");
 const peakMinScore = ref("");
-const sourceGraph = ref<RegulatoryGraph>(emptyRegulatoryGraph(groupBy.value));
-const visibleGraph = ref<RegulatoryGraph>(emptyRegulatoryGraph(groupBy.value));
+const geneQueryError = ref("");
+const peakQueryError = ref("");
+const linkedGeneQueryError = ref("");
+type QueryInputErrorField = "gene" | "peak" | "linkedGene";
+const queryInputErrorTimers: Record<QueryInputErrorField, number | undefined> = {
+  gene: undefined,
+  peak: undefined,
+  linkedGene: undefined,
+};
+const sourceGraph = ref<RegulatoryGraph>(emptyRegulatoryGraph());
+const visibleGraph = ref<RegulatoryGraph>(emptyRegulatoryGraph());
 const graphDimensions = ref<GraphDimensions>({ ...DEFAULT_GRAPH_DIMENSIONS });
 const graphHostEl = ref<HTMLElement | null>(null);
 const loading = ref(false);
@@ -653,8 +645,6 @@ const fullLinksPageSizeOptions = [20, 50, 100];
 const domainChip = computed(() => domainDisplayLabel(props.domain));
 const domainTitle = computed(() => domainChip.value);
 const hasGraphData = computed(() => visibleGraph.value.nodes.length > 0);
-const hasTfNodes = computed(() => visibleGraph.value.nodes.some((node) => node.type === "tf"));
-const showGroupByControl = computed(() => !loaded.value || visibleGraph.value.hasGroupData || props.demoMode);
 const nodeById = computed(() => new Map(visibleGraph.value.nodes.map((node) => [node.id, node] as const)));
 const edgeById = computed(() => new Map(visibleGraph.value.edges.map((edge) => [edge.id, edge] as const)));
 const sourceNodeById = computed(() => new Map(sourceGraph.value.nodes.map((node) => [node.id, node] as const)));
@@ -692,7 +682,6 @@ const linksEmptyMessage = computed(() => {
   return "No visible peak-to-gene links are currently shown in the graph.";
 });
 const graphMessage = computed(() => {
-  if (props.demoMode) return "No regulatory links matched the current query.";
   return "No regulatory network data is available for this sample yet.";
 });
 const actionNode = computed(() => {
@@ -710,6 +699,29 @@ const selectedDetailSubtitle = computed(() => {
   if (!detail?.subtitle) return "";
   return hasDistinctSubtitle(detail.title, detail.subtitle) ? detail.subtitle : "";
 });
+
+function hashId(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) {
+    h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+const GENE_COLORS = ["#B11D56", "#11A3B8"] as const;
+const PEAK_COLORS = ["#F59ABB", "#8FD9E5"] as const;
+
+const inspectorChipStyle = computed(() => {
+  const node = selectedNode.value;
+  if (!node || (node.type !== "gene" && node.type !== "peak")) return {} as Record<string, string>;
+  const colors: readonly string[] = node.type === "gene" ? GENE_COLORS : PEAK_COLORS;
+  const hex = colors[hashId(node.id) % colors.length]!;
+  return {
+    backgroundColor: `color-mix(in srgb, ${hex} 28%, #ffffff)`,
+    borderColor: hex,
+    color: `color-mix(in srgb, ${hex} 52%, #243238)`,
+    boxShadow: `inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 2px 7px ${hex}38`,
+  };
+});
 const helperContinueNode = computed(() => {
   return helperContinueNodeId.value ? nodeById.value.get(helperContinueNodeId.value) ?? null : null;
 });
@@ -721,17 +733,16 @@ const fullLinksAction = computed<FullLinksAction | null>(() => {
   const node = selectedNode.value;
   if (!node || !supportsFullLinksQuery(node)) return null;
   const total = getNodeFullLinksTotal(node);
-  if (!isFiniteNumber(total) || total <= LOCAL_NODE_LINK_LIMIT) return null;
   return {
     label: getFullLinksButtonLabel(node),
-    total,
+    total: isFiniteNumber(total) ? total : 0,
   };
 });
 const fullLinksDialogTitle = computed(() => {
   const node = selectedNode.value;
   if (!node) return "All links";
   const label = node.label;
-  if (node.type === "gene" || node.type === "tf") return `All peak links for ${label}`;
+  if (node.type === "gene") return `All peak links for ${label}`;
   if (node.type === "peak") return `All gene links for ${label}`;
   return `All links for ${label}`;
 });
@@ -744,7 +755,7 @@ const hasFullLinksVarQValues = computed(() => fullLinksItems.value.some((link) =
 const hasFullLinksDatasetValues = computed(() => fullLinksItems.value.some((link) => hasDisplayValue(link.datasetId)));
 const hasFullLinksSampleValues = computed(() => fullLinksItems.value.some((link) => hasDisplayValue(link.sampleName)));
 
-watch(() => [props.datasetId, props.domain, props.demoMode, props.demoSize] as const, () => {
+watch(() => [props.datasetId, props.domain] as const, () => {
   resetNetwork();
 }, { immediate: true });
 
@@ -779,22 +790,18 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.clearTimeout(newItemTimer);
+  clearAllQueryInputErrors();
   graphResizeObserver?.disconnect();
   graphResizeObserver = null;
 });
 
-function reloadWithGroupBy() {
-  loadNetwork("default");
-}
-
 async function resetNetwork() {
+  clearAllQueryInputErrors();
   queryMode.value = "gene";
-  groupBy.value = "cell_type";
   geneQuery.value = "";
   geneMinScore.value = "";
   peakQuery.value = "";
   linkedGeneQuery.value = "";
-  peakMaxDistance.value = "";
   peakMinScore.value = "";
   clearSelection();
   exhaustedNodeIds.value = new Set();
@@ -803,25 +810,55 @@ async function resetNetwork() {
   await loadNetwork("default");
 }
 
-const peakHintVisible = ref(false);
-let peakHintTimer: ReturnType<typeof setTimeout> | undefined;
-const PEAK_REGION_PATTERN = /^chr[\w]+:\d[\d,]*-(\d[\d,]*)$/i;
+const GENE_SYMBOL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const PEAK_REGION_PATTERN = /^chr[A-Za-z0-9_.-]+:(\d+)-(\d+)$/i;
+
+function queryInputErrorRef(field: QueryInputErrorField) {
+  if (field === "gene") return geneQueryError;
+  if (field === "peak") return peakQueryError;
+  return linkedGeneQueryError;
+}
+
+function showQueryInputError(field: QueryInputErrorField, message: string) {
+  clearQueryInputError(field);
+  queryInputErrorRef(field).value = message;
+  queryInputErrorTimers[field] = window.setTimeout(() => {
+    queryInputErrorRef(field).value = "";
+    queryInputErrorTimers[field] = undefined;
+  }, 3000);
+}
+
+function clearQueryInputError(field: QueryInputErrorField) {
+  const timer = queryInputErrorTimers[field];
+  if (timer !== undefined) window.clearTimeout(timer);
+  queryInputErrorTimers[field] = undefined;
+  queryInputErrorRef(field).value = "";
+}
+
+function clearAllQueryInputErrors() {
+  clearQueryInputError("gene");
+  clearQueryInputError("peak");
+  clearQueryInputError("linkedGene");
+}
 
 async function searchNetwork() {
+  const gene = queryMode.value === "gene" ? geneQuery.value.trim() : linkedGeneQuery.value.trim();
+  const peak = queryMode.value === "peak" ? peakQuery.value.trim() : "";
+  if (gene && !GENE_SYMBOL_PATTERN.test(gene)) {
+    showQueryInputError(queryMode.value === "gene" ? "gene" : "linkedGene", "Enter a single valid gene symbol.");
+    return;
+  }
+  if (peak && !isValidPeakRegion(peak)) {
+    showQueryInputError("peak", "Enter a single peak region in chr:start-end format.");
+    return;
+  }
+
+  clearAllQueryInputErrors();
+
   clearSelection();
   exhaustedNodeIds.value = new Set();
   autoExpandedNodeIds.value = new Set();
   focusedNodeId.value = "";
-
-  if (queryMode.value === "peak") {
-    const peak = peakQuery.value.trim();
-    if (peak && !PEAK_REGION_PATTERN.test(peak)) {
-      clearTimeout(peakHintTimer);
-      peakHintVisible.value = true;
-      peakHintTimer = setTimeout(() => { peakHintVisible.value = false; }, 2500);
-      return;
-    }
-  }
 
   const intent: QueryIntent = queryMode.value === "gene" && geneQuery.value.trim()
     ? "gene"
@@ -831,11 +868,19 @@ async function searchNetwork() {
   await loadNetwork(intent);
 }
 
+function isValidPeakRegion(value: string): boolean {
+  const match = value.match(PEAK_REGION_PATTERN);
+  if (!match) return false;
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start >= 0 && end > start;
+}
+
 async function loadNetwork(intent: QueryIntent) {
   const normalizedDatasetId = props.datasetId.trim();
   if (!normalizedDatasetId) {
-    sourceGraph.value = emptyRegulatoryGraph(groupBy.value);
-    visibleGraph.value = emptyRegulatoryGraph(groupBy.value);
+    sourceGraph.value = emptyRegulatoryGraph();
+    visibleGraph.value = emptyRegulatoryGraph();
     loaded.value = true;
     return;
   }
@@ -851,7 +896,7 @@ async function loadNetwork(intent: QueryIntent) {
     const response = await requestNetwork(intent);
     if (token !== requestToken) return;
 
-    const adapted = adaptRegulatoryResponse(response, groupBy.value);
+    const adapted = adaptRegulatoryResponse(response);
     sourceGraph.value = adapted;
     const nextGraph = createGraphForIntent(sourceGraph.value, intent);
     visibleGraph.value = nextGraph;
@@ -869,8 +914,8 @@ async function loadNetwork(intent: QueryIntent) {
   } catch (loadError) {
     if (token !== requestToken) return;
     if (isSearchResultEndpointUnavailable(loadError)) {
-      sourceGraph.value = emptyRegulatoryGraph(groupBy.value);
-      visibleGraph.value = emptyRegulatoryGraph(groupBy.value);
+      sourceGraph.value = emptyRegulatoryGraph();
+      visibleGraph.value = emptyRegulatoryGraph();
       loaded.value = true;
     } else {
       console.error("[SearchResult] Failed to load regulatory network:", loadError);
@@ -887,27 +932,13 @@ async function requestNetwork(intent: QueryIntent): Promise<RegulatoryNetworkRes
   const gene = intent === "gene" ? geneQuery.value.trim() : linkedGeneQuery.value.trim();
   const peak = intent === "peak" ? peakQuery.value.trim() : "";
 
-  if (props.demoMode) {
-    return getDemoRegulatoryNetwork({
-      demoSize: props.demoSize,
-      mode,
-      gene,
-      peak,
-      groupBy: groupBy.value,
-      minScore: params.minScore,
-      maxDistance: params.maxDistance,
-    });
-  }
-
   return fetchRegulatoryNetwork({
     datasetId: props.datasetId,
     domain: props.domain,
     mode,
     gene,
     peak,
-    groupBy: groupBy.value,
     minScore: params.minScore,
-    maxDistance: params.maxDistance,
     maxNodes: 80,
     maxEdges: 120,
   });
@@ -916,7 +947,7 @@ async function requestNetwork(intent: QueryIntent): Promise<RegulatoryNetworkRes
 function createGraphForIntent(adapted: RegulatoryGraph, intent: QueryIntent): RegulatoryGraph {
   if (!adapted.nodes.length) {
     const anchor = getQueryAnchorDefinition(intent);
-    return anchor ? createAnchorGraph(anchor, groupBy.value) : emptyRegulatoryGraph(groupBy.value);
+    return anchor ? createAnchorGraph(anchor) : emptyRegulatoryGraph();
   }
 
   if (intent === "default") {
@@ -960,6 +991,7 @@ function getQueryAnchorDefinition(intent: QueryIntent): Pick<GraphNode, "id" | "
 
 function setQueryMode(nextMode: RegulatoryNetworkMode) {
   interactionEpoch.value += 1;
+  clearAllQueryInputErrors();
   queryMode.value = nextMode;
   inspectorHelper.value = "";
   helperContinueNodeId.value = "";
@@ -1015,7 +1047,7 @@ function resetGraphView() {
   viewportPan.value = { x: 0, y: 0 };
   visibleGraph.value = sourceGraph.value.nodes.length
     ? layoutInitialGraph(selectInitialSubgraph(sourceGraph.value), graphDimensions.value)
-    : emptyRegulatoryGraph(groupBy.value);
+    : emptyRegulatoryGraph();
   linkPage.value = 1;
 }
 
@@ -1073,7 +1105,7 @@ async function focusOnNode(nodeId: string) {
     const addition = await requestExpansion(sourceNode, getFocusNeighborCap(sourceNode));
     if (token !== requestToken) return;
     if (epoch !== interactionEpoch.value) return;
-    const adapted = adaptRegulatoryResponse(addition, groupBy.value);
+    const adapted = adaptRegulatoryResponse(addition);
     mergeIntoSourceGraph(adapted);
     visibleGraph.value = layoutFocusGraph(getSourceGraphForNode(node.id), node.id, graphDimensions.value);
     selectedNodeId.value = node.id;
@@ -1127,7 +1159,7 @@ async function expandNode(
     const previousGraph = visibleGraph.value;
     let result = mergeRegulatoryGraphs(
       previousGraph,
-      selectDirectNeighborhoodSubgraph(getSourceGraphForNode(node.id), node.id, maxNeighbors, GROUP_PEAK_BUDGET_PER_GENE)
+      selectDirectNeighborhoodSubgraph(getSourceGraphForNode(node.id), node.id, maxNeighbors)
     );
 
     if (!hasMergeChanges(result)) {
@@ -1135,10 +1167,10 @@ async function expandNode(
       const addition = await requestExpansion(sourceNode, maxNeighbors);
       if (token !== requestToken) return;
       if (isStaleAutoExpansion(reason, node.id, epoch)) return;
-      mergeIntoSourceGraph(adaptRegulatoryResponse(addition, groupBy.value));
+      mergeIntoSourceGraph(adaptRegulatoryResponse(addition));
       result = mergeRegulatoryGraphs(
         previousGraph,
-        selectDirectNeighborhoodSubgraph(getSourceGraphForNode(node.id), node.id, maxNeighbors, GROUP_PEAK_BUDGET_PER_GENE)
+        selectDirectNeighborhoodSubgraph(getSourceGraphForNode(node.id), node.id, maxNeighbors)
       );
     } else if (token !== requestToken) {
       return;
@@ -1204,26 +1236,14 @@ async function requestExpansion(node: GraphNode, maxNeighbors: number): Promise<
   const params = currentQueryParams();
   const nodeType = getExpansionNodeType(node);
 
-  if (props.demoMode) {
-    return getDemoRegulatoryExpansion({
-      demoSize: props.demoSize,
-      nodeId: node.id,
-      nodeType,
-      groupBy: groupBy.value,
-      minScore: params.minScore,
-      maxDistance: params.maxDistance,
-      maxNeighbors,
-    });
-  }
-
   return fetchRegulatoryNetworkExpansion({
     datasetId: props.datasetId,
     domain: props.domain,
     nodeId: node.id,
     nodeType,
-    groupBy: groupBy.value,
+    gene: params.gene,
+    peak: params.peak,
     minScore: params.minScore,
-    maxDistance: params.maxDistance,
     maxNeighbors,
   });
 }
@@ -1279,8 +1299,6 @@ function getExpansionNodeType(node: GraphNode): RegulatoryNetworkNodeType {
 
 function getFocusNeighborCap(node: GraphNode): number {
   if (node.type === "gene") return GENE_INITIAL_LINK_LIMIT;
-  if (node.type === "peak") return NODE_RELATED_STEP;
-  if (node.type === "group") return GROUP_VISIBLE_GENE_LIMIT * GROUP_PEAK_BUDGET_PER_GENE;
   return NODE_RELATED_STEP;
 }
 
@@ -1301,19 +1319,6 @@ function getExpansionNeighborCap(node: GraphNode, reason: ExpandReason): number 
     return Math.min(maxGenes, currentGenes + NODE_RELATED_STEP);
   }
 
-  if (node.type === "group") {
-    const currentMarkerGenes = getVisibleMarkerGeneCount(node.id);
-    if (currentMarkerGenes >= GROUP_VISIBLE_GENE_LIMIT) return 0;
-    if (reason === "auto") return Math.min(
-      (currentMarkerGenes + 1) * GROUP_PEAK_BUDGET_PER_GENE,
-      GROUP_VISIBLE_GENE_LIMIT * GROUP_PEAK_BUDGET_PER_GENE
-    );
-    return Math.min(
-      (currentMarkerGenes + 2) * GROUP_PEAK_BUDGET_PER_GENE,
-      GROUP_VISIBLE_GENE_LIMIT * GROUP_PEAK_BUDGET_PER_GENE
-    );
-  }
-
   return NODE_RELATED_STEP;
 }
 
@@ -1323,14 +1328,6 @@ function getVisibleDirectPeakCount(geneId: string): number {
 
 function getVisibleDirectGeneCount(peakId: string): number {
   return getPeakGeneLinksForPeak(visibleGraph.value, peakId).length;
-}
-
-function getVisibleMarkerGeneCount(groupId: string): number {
-  return visibleGraph.value.edges.filter((edge) => {
-    if (edge.type !== "marker") return false;
-    const neighborId = edge.source === groupId ? edge.target : edge.target === groupId ? edge.source : "";
-    return Boolean(neighborId && nodeById.value.get(neighborId)?.type === "gene");
-  }).length;
 }
 
 function getGeneExpansionNeighborLimit(node: GraphNode): number {
@@ -1371,7 +1368,7 @@ function getLocalLinkLimitHint(totalCount: number | null | undefined): string | 
 }
 
 function supportsFullLinksQuery(node: GraphNode): boolean {
-  return node.type === "gene" || node.type === "peak" || node.type === "group" || node.type === "tf";
+  return node.type === "gene" || node.type === "peak";
 }
 
 function getFullLinksButtonLabel(node: GraphNode): string {
@@ -1381,21 +1378,13 @@ function getFullLinksButtonLabel(node: GraphNode): string {
 }
 
 function getNodeFullLinksTotal(node: GraphNode): number | null {
-  if (node.type === "gene" || node.type === "tf") return getLinkedPeaksTotal(node);
-  if (node.type === "peak") return getLinkedGenesTotal(node);
-  return getGroupLinksTotal(node);
+  if (node.type === "gene") return getLinkedPeaksTotal(node);
+  return getLinkedGenesTotal(node);
 }
 
 function isNodeExhausted(node: GraphNode): boolean {
   if (node.type === "gene") return getVisibleDirectPeakCount(node.id) >= getGeneExpansionNeighborLimit(node);
-  if (node.type === "peak") return getVisibleDirectGeneCount(node.id) >= getPeakExpansionNeighborLimit(node);
-  if (node.type === "group") {
-    if (getVisibleMarkerGeneCount(node.id) >= GROUP_VISIBLE_GENE_LIMIT) return true;
-    return exhaustedNodeIds.value.has(node.id);
-  }
-  if (hasNodeExpandableDirectNeighbors(node)) return false;
-  if (exhaustedNodeIds.value.has(node.id)) return true;
-  return false;
+  return getVisibleDirectGeneCount(node.id) >= getPeakExpansionNeighborLimit(node);
 }
 
 function hasNodeExpandableDirectNeighbors(node: GraphNode): boolean {
@@ -1403,15 +1392,7 @@ function hasNodeExpandableDirectNeighbors(node: GraphNode): boolean {
     return getVisibleDirectPeakCount(node.id) < getGeneExpansionNeighborLimit(node);
   }
 
-  if (node.type === "peak") {
-    return getVisibleDirectGeneCount(node.id) < getPeakExpansionNeighborLimit(node);
-  }
-
-  if (node.type === "group") {
-    return getVisibleMarkerGeneCount(node.id) < GROUP_VISIBLE_GENE_LIMIT;
-  }
-
-  return false;
+  return getVisibleDirectGeneCount(node.id) < getPeakExpansionNeighborLimit(node);
 }
 
 function isGraphNodeDisplayLimitBlockingExpansion(node: GraphNode): boolean {
@@ -1483,16 +1464,14 @@ function getNodeActions(node: GraphNode): InspectorAction[] {
 function getNodeDetail(node: GraphNode): InspectorDetail {
   const actions = getNodeActions(node);
 
-  if (node.type === "gene" || node.type === "tf") {
+  if (node.type === "gene") {
     const geneLinks = getPeakGeneLinksForGene(visibleGraph.value, node.id);
-    const groupValue = visibleGraph.value.hasGroupData ? displayText(node.metadata.group) : "";
     const summary = getDatasetSummaryFromLinks(geneLinks, node.metadata);
     const topLinkedPeaks = getTopListValue(node.metadata.topLinkedPeaks, geneLinks.map((link) => link.topLinkedPeaks), geneLinks.map((link) => link.peak));
     const linkedPeaksTotal = getLinkedPeaksTotal(node, geneLinks) ?? getUniqueLinkCount(geneLinks, "peak");
     const visiblePeakCount = getVisibleDirectPeakCount(node.id);
     const items: InspectorDetailItem[] = [];
-    appendIfValue(items, node.type === "tf" ? "TF symbol" : "Gene symbol", node.label);
-    if (visibleGraph.value.hasGroupData) appendIfValue(items, "Related group", groupValue);
+    appendIfValue(items, "Gene symbol", node.label);
     appendIfValue(items, "Best linked peak", getFirstTopListItem(topLinkedPeaks));
     appendIfValue(items, "Linked peaks", formatTotalCount(linkedPeaksTotal));
     appendIfValue(items, "Visible in graph", formatVisibleInGraphCount(visiblePeakCount, linkedPeaksTotal));
@@ -1504,77 +1483,52 @@ function getNodeDetail(node: GraphNode): InspectorDetail {
       geneLinks.map((link) => link.correlation)
     ));
     appendFdrSummary(items, node.metadata, geneLinks);
-    if (visibleGraph.value.hasGroupData) {
-      appendIfValue(items, "Marker score", formatNumberValue(node.metadata.markerScore));
-      appendIfValue(items, "Marker rank", formatNumberValue(node.metadata.markerRank));
-    }
     appendDatasetSummaryItems(items, summary);
     appendProvenance(items, summary, geneLinks.map((link) => link.source), node.metadata.source);
 
     return {
       kind: node.type,
-      chip: node.type === "tf" ? "TF" : "Gene",
+      chip: "Gene",
       title: node.label,
-      subtitle: visibleGraph.value.hasGroupData ? groupValue : undefined,
       items,
       actions,
     };
   }
 
-  if (node.type === "peak") {
-    const peakLinks = getPeakGeneLinksForPeak(visibleGraph.value, node.id);
-    const title = node.label;
-    const summary = getDatasetSummaryFromLinks(peakLinks, node.metadata);
-    const topLinkedGenes = getTopListValue(node.metadata.topLinkedGenes, peakLinks.map((link) => link.topLinkedGenes), peakLinks.map((link) => link.geneSymbol));
-    const linkedGenesTotal = getLinkedGenesTotal(node, peakLinks) ?? getUniqueLinkCount(peakLinks, "gene");
-    const visibleGeneCount = getVisibleDirectGeneCount(node.id);
-    const items: InspectorDetailItem[] = [];
-    appendIfValue(items, "Linked genes", formatTotalCount(linkedGenesTotal));
-    appendIfValue(items, "Visible in graph", formatVisibleInGraphCount(visibleGeneCount, linkedGenesTotal));
-    appendIfValue(items, "Graph view", getLocalLinkLimitHint(linkedGenesTotal));
-    appendIfValue(items, "Top linked genes", formatTopListWithMore(
-      topLinkedGenes,
-      node.metadata.remainingLinkedGenesCount ?? getFirstFiniteNumber(peakLinks.map((link) => link.remainingLinkedGenesCount)),
-      3
-    ));
-    appendIfValue(items, "Best linked gene", getFirstTopListItem(topLinkedGenes));
-    appendIfValue(items, "Max link score", formatNumberValue(node.metadata.maxLinkScore ?? getFirstFiniteNumber(peakLinks.map((link) => link.maxLinkScore)) ?? getMaxLinkScoreValue(peakLinks)));
-    appendIfValue(items, "Correlation range", formatRangeFromSummary(
-      node.metadata.correlationMin ?? getFirstFiniteNumber(peakLinks.map((link) => link.correlationMin)),
-      node.metadata.correlationMax ?? getFirstFiniteNumber(peakLinks.map((link) => link.correlationMax)),
-      peakLinks.map((link) => link.correlation)
-    ));
-    appendFdrSummary(items, node.metadata, peakLinks);
-    appendDatasetSummaryItems(items, summary);
-    appendProvenance(items, summary, peakLinks.map((link) => link.source), node.metadata.source);
-
-    return {
-      kind: "peak",
-      chip: "Peak",
-      title,
-      subtitle: node.metadata.chromosome
-        ? `${node.metadata.chromosome}:${displayText(node.metadata.start)}-${displayText(node.metadata.end)}`
-        : undefined,
-      items: filterPeakDetailItems(title, items),
-      actions,
-    };
-  }
-
-  const groupLinks = getGroupLinks(visibleGraph.value, node.label);
-  const groupItems: InspectorDetailItem[] = [];
-  appendIfValue(groupItems, "Name", node.label);
-  appendIfValue(groupItems, "Cell count", formatNumberValue(node.metadata.cellCount));
-  appendIfValue(groupItems, "Proportion", formatPercentValue(node.metadata.proportion));
-  appendIfValue(groupItems, "Visible marker genes", getVisibleMarkerGeneCount(node.id).toLocaleString());
-  const groupSummary = getDatasetSummaryFromLinks(groupLinks, node.metadata);
-  appendDatasetSummaryItems(groupItems, groupSummary);
-  appendProvenance(groupItems, groupSummary, groupLinks.map((link) => link.source), node.metadata.source);
+  const peakLinks = getPeakGeneLinksForPeak(visibleGraph.value, node.id);
+  const title = node.label;
+  const summary = getDatasetSummaryFromLinks(peakLinks, node.metadata);
+  const topLinkedGenes = getTopListValue(node.metadata.topLinkedGenes, peakLinks.map((link) => link.topLinkedGenes), peakLinks.map((link) => link.geneSymbol));
+  const linkedGenesTotal = getLinkedGenesTotal(node, peakLinks) ?? getUniqueLinkCount(peakLinks, "gene");
+  const visibleGeneCount = getVisibleDirectGeneCount(node.id);
+  const items: InspectorDetailItem[] = [];
+  appendIfValue(items, "Linked genes", formatTotalCount(linkedGenesTotal));
+  appendIfValue(items, "Visible in graph", formatVisibleInGraphCount(visibleGeneCount, linkedGenesTotal));
+  appendIfValue(items, "Graph view", getLocalLinkLimitHint(linkedGenesTotal));
+  appendIfValue(items, "Top linked genes", formatTopListWithMore(
+    topLinkedGenes,
+    node.metadata.remainingLinkedGenesCount ?? getFirstFiniteNumber(peakLinks.map((link) => link.remainingLinkedGenesCount)),
+    3
+  ));
+  appendIfValue(items, "Best linked gene", getFirstTopListItem(topLinkedGenes));
+  appendIfValue(items, "Max link score", formatNumberValue(node.metadata.maxLinkScore ?? getFirstFiniteNumber(peakLinks.map((link) => link.maxLinkScore)) ?? getMaxLinkScoreValue(peakLinks)));
+  appendIfValue(items, "Correlation range", formatRangeFromSummary(
+    node.metadata.correlationMin ?? getFirstFiniteNumber(peakLinks.map((link) => link.correlationMin)),
+    node.metadata.correlationMax ?? getFirstFiniteNumber(peakLinks.map((link) => link.correlationMax)),
+    peakLinks.map((link) => link.correlation)
+  ));
+  appendFdrSummary(items, node.metadata, peakLinks);
+  appendDatasetSummaryItems(items, summary);
+  appendProvenance(items, summary, peakLinks.map((link) => link.source), node.metadata.source);
 
   return {
-    kind: "group",
-    chip: groupBy.value === "cluster" ? "Cluster" : "Cell type",
-    title: node.label,
-    items: groupItems,
+    kind: "peak",
+    chip: "Peak",
+    title,
+    subtitle: node.metadata.chromosome
+      ? `${node.metadata.chromosome}:${displayText(node.metadata.start)}-${displayText(node.metadata.end)}`
+      : undefined,
+    items: filterPeakDetailItems(title, items),
     actions,
   };
 }
@@ -1609,40 +1563,23 @@ function getEdgeDetail(edge: GraphEdge): InspectorDetail {
   const link = getLinkForEdge(edge);
   const preferredNode = getPreferredNodeForEdgeAction(edge);
 
-  if (edge.type === "peakGene") {
-    const items: InspectorDetailItem[] = [];
-    appendIfValue(items, "Peak", link?.peak ?? getNodeLabel(edge.source));
-    appendIfValue(items, "Linked gene", link?.geneSymbol ?? getNodeLabel(edge.target));
-    appendIfValue(items, "Link score", formatNumberValue(link?.linkScore ?? link?.score ?? edge.score));
-    appendIfValue(items, "Distance to TSS", formatNumberValue(link?.distanceToTss ?? edge.distanceToTss));
-    appendIfValue(items, "Correlation", formatNumberValue(link?.correlation ?? edge.correlation));
-    appendIfValue(items, "FDR", formatNumberValue(link?.fdr ?? edge.fdr));
-    appendIfValue(items, "VarQ ATAC", formatNumberValue(link?.varQAtac ?? edge.varQAtac));
-    appendIfValue(items, "VarQ RNA", formatNumberValue(link?.varQRna ?? edge.varQRna));
-    const summary = getDatasetSummaryFromLinks(link ? [link] : []);
-    appendDatasetSummaryItems(items, summary);
-    appendProvenance(items, summary, [link?.source, edge.sourceMethod]);
-
-    return {
-      kind: "edge",
-      chip: "Peak-to-gene",
-      title: `${displayText(link?.peak ?? getNodeLabel(edge.source))} -> ${displayText(link?.geneSymbol ?? getNodeLabel(edge.target))}`,
-      items,
-      actions: preferredNode ? getNodeActions(preferredNode) : undefined,
-    };
-  }
-
   const items: InspectorDetailItem[] = [];
-  appendIfValue(items, "Source node", getNodeLabel(edge.source));
-  appendIfValue(items, "Target node", getNodeLabel(edge.target));
-  const summary = getDatasetSummaryFromLinks([]);
+  appendIfValue(items, "Peak", link?.peak ?? getNodeLabel(edge.source));
+  appendIfValue(items, "Linked gene", link?.geneSymbol ?? getNodeLabel(edge.target));
+  appendIfValue(items, "Link score", formatNumberValue(link?.linkScore ?? link?.score ?? edge.score));
+  appendIfValue(items, "Distance to TSS", formatNumberValue(link?.distanceToTss ?? edge.distanceToTss));
+  appendIfValue(items, "Correlation", formatNumberValue(link?.correlation ?? edge.correlation));
+  appendIfValue(items, "FDR", formatNumberValue(link?.fdr ?? edge.fdr));
+  appendIfValue(items, "VarQ ATAC", formatNumberValue(link?.varQAtac ?? edge.varQAtac));
+  appendIfValue(items, "VarQ RNA", formatNumberValue(link?.varQRna ?? edge.varQRna));
+  const summary = getDatasetSummaryFromLinks(link ? [link] : []);
   appendDatasetSummaryItems(items, summary);
-  appendProvenance(items, summary, [edge.sourceMethod]);
+  appendProvenance(items, summary, [link?.source, edge.sourceMethod]);
 
   return {
     kind: "edge",
-    chip: edge.type === "tfPeak" ? "TF to peak" : "Marker",
-    title: `${getNodeLabel(edge.source)} -> ${getNodeLabel(edge.target)}`,
+    chip: "Peak-to-gene",
+    title: `${displayText(link?.peak ?? getNodeLabel(edge.source))} -> ${displayText(link?.geneSymbol ?? getNodeLabel(edge.target))}`,
     items,
     actions: preferredNode ? getNodeActions(preferredNode) : undefined,
   };
@@ -1673,6 +1610,46 @@ function openLinkDetail(row: GraphLink) {
   helperContinueNodeId.value = "";
 }
 
+function peakCoordinates(row: GraphLink): { chrom: string; start: number; end: number } | null {
+  const match = row.peak.replace(/,/g, "").trim().match(/^(chr[^:\s]+):(\d+)-(\d+)$/i);
+  if (!match) return null;
+  const start = Number(match[2]);
+  const end = Number(match[3]);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) return null;
+  return { chrom: match[1]!, start, end };
+}
+
+function canViewPeakDetail(row: GraphLink): boolean {
+  return peakCoordinates(row) !== null;
+}
+
+function peakDatasetLabel(row: GraphLink): string {
+  return displayText(row.datasetId || props.datasetId);
+}
+
+function peakDomainLabel(row: GraphLink): string {
+  return displayText(formatDomainValue(row.domain || props.domain));
+}
+
+function goToPeakDetail(row: GraphLink) {
+  const coordinates = peakCoordinates(row);
+  if (!coordinates) return;
+  void router.push({
+    path: "/feature-detail",
+    query: {
+      type: "peak",
+      chrom: coordinates.chrom,
+      start: String(coordinates.start),
+      end: String(coordinates.end),
+      peakId: row.peakId || undefined,
+      datasetId: row.datasetId || props.datasetId,
+      domain: row.domain || props.domain,
+      source: "sample_regulatory_network",
+      returnTo: route.fullPath,
+    },
+  });
+}
+
 function continueHelperExpansion() {
   const node = helperContinueNode.value;
   if (!node || isNodeExpansionDisabled(node)) return;
@@ -1688,7 +1665,6 @@ function getLinkRelevance(row: GraphLink): number {
   if (!selectedNode.value) return 0;
   if (selectedNode.value.type === "peak") return getPeakNodeId(row.peak) === selectedNode.value.id ? 3 : 0;
   if (selectedNode.value.type === "gene") return getGeneNodeId(row.geneSymbol) === selectedNode.value.id ? 3 : 0;
-  if (selectedNode.value.type === "group") return row.group === selectedNode.value.label ? 2 : 0;
   return 0;
 }
 
@@ -1700,10 +1676,15 @@ function getLinkScore(link: GraphLink): number {
   return Number(link.linkScore ?? link.score ?? 0);
 }
 
-function currentQueryParams(): { minScore?: number; maxDistance?: number } {
+function currentQueryParams(): { minScore?: number; gene?: string; peak?: string } {
   const minScore = parseOptionalNumber(queryMode.value === "gene" ? geneMinScore.value : peakMinScore.value);
-  const maxDistance = queryMode.value === "peak" ? parseOptionalNumber(peakMaxDistance.value) : undefined;
-  return { minScore, maxDistance };
+  const gene = queryMode.value === "gene" ? geneQuery.value.trim() : linkedGeneQuery.value.trim();
+  const peak = queryMode.value === "peak" ? peakQuery.value.trim() : "";
+  return {
+    minScore,
+    gene: gene || undefined,
+    peak: peak || undefined,
+  };
 }
 
 function parseOptionalNumber(value: string): number | undefined {
@@ -1808,20 +1789,6 @@ function getLinkedGenesTotal(
   ]);
 }
 
-function getGroupLinksTotal(node: GraphNode): number | null {
-  const sourceNode = sourceNodeById.value.get(node.id);
-  const visibleGroupLinks = getGroupLinks(visibleGraph.value, node.label);
-  const sourceGroupLinks = getGroupLinks(sourceGraph.value, node.label);
-  return getMaxFiniteCount([
-    node.metadata.totalLinks,
-    sourceNode?.metadata.totalLinks,
-    ...visibleGroupLinks.map((link) => link.totalLinks),
-    ...sourceGroupLinks.map((link) => link.totalLinks),
-    visibleGroupLinks.length,
-    sourceGroupLinks.length,
-  ]);
-}
-
 function getMaxLinkScoreValue(nodeLinks: GraphLink[]): number | null {
   const scores = nodeLinks
     .map((link) => link.linkScore ?? link.score)
@@ -1850,10 +1817,6 @@ function formatVisibleInGraphCount(visibleCount: number, totalCount: number | nu
 
 function formatNumberValue(value: unknown): string | undefined {
   return isFiniteNumber(value) ? formatNumber(value) : undefined;
-}
-
-function formatPercentValue(value: unknown): string | undefined {
-  return isFiniteNumber(value) ? `${Number((value * 100).toFixed(1))}%` : undefined;
 }
 
 function formatRangeFromSummary(
@@ -1987,9 +1950,7 @@ async function loadFullLinks() {
   fullLinksError.value = "";
 
   try {
-    const response = props.demoMode
-      ? getDemoFullLinksResponse(node, fullLinksPage.value, fullLinksPageSize.value)
-      : await requestFullLinks(node);
+    const response = await requestFullLinks(node);
 
     if (token !== fullLinksRequestToken) return;
     fullLinksTotal.value = response.total;
@@ -2016,28 +1977,10 @@ async function requestFullLinks(node: GraphNode) {
     nodeId: node.id,
     page: fullLinksPage.value,
     pageSize: fullLinksPageSize.value,
-    groupBy: groupBy.value,
+    gene: params.gene,
+    peak: params.peak,
     minScore: params.minScore,
-    maxDistance: params.maxDistance,
   });
-}
-
-function getDemoFullLinksResponse(node: GraphNode, page: number, pageSize: number) {
-  const graph = sourceGraph.value.nodes.length ? sourceGraph.value : visibleGraph.value;
-  const links = getFullLinksForNode(graph, node);
-  const start = Math.max(0, (page - 1) * pageSize);
-  return {
-    total: links.length,
-    page,
-    pageSize,
-    items: links.slice(start, start + pageSize),
-  };
-}
-
-function getFullLinksForNode(graph: RegulatoryGraph, node: GraphNode): GraphLink[] {
-  if (node.type === "peak") return getPeakGeneLinksForPeak(graph, node.id);
-  if (node.type === "group") return getGroupLinks(graph, node.label);
-  return getPeakGeneLinksForGene(graph, node.id);
 }
 
 function normalizeFullLinkItems(items: RegulatoryNetworkLink[]): GraphLink[] {
@@ -2047,7 +1990,7 @@ function normalizeFullLinkItems(items: RegulatoryNetworkLink[]): GraphLink[] {
     links: items,
     datasetId: props.datasetId,
     domain: props.domain,
-  }, groupBy.value).links;
+  }).links;
 }
 
 function onFullLinksPageSizeChange(size: number) {
@@ -2069,20 +2012,45 @@ function downloadCsv() {
   );
 }
 
-function downloadFullLinksPageCsv() {
-  if (!fullLinksItems.value.length || !selectedNode.value) return;
-  const nodePart = sanitizeFilenamePart(selectedNode.value.label);
-  downloadLinksCsv(
-    fullLinksItems.value,
-    `${sanitizeFilenamePart(props.datasetId)}_${props.domain}_${nodePart}_regulatory_links_page_${fullLinksPage.value}.csv`
-  );
+async function downloadFullLinksAllCsv() {
+  const node = selectedNode.value;
+  if (!node || !fullLinksAction.value) return;
+  const nodePart = sanitizeFilenamePart(node.label);
+  const filename = `${sanitizeFilenamePart(props.datasetId)}_${props.domain}_${nodePart}_regulatory_links_all.csv`;
+  const allItems: GraphLink[] = [];
+  const params = currentQueryParams();
+  const pageSize = 100;
+  let page = 1;
+  let total = 0;
+  try {
+    while (true) {
+      const response = await fetchRegulatoryNetworkLinks({
+        datasetId: props.datasetId,
+        domain: props.domain,
+        nodeType: getExpansionNodeType(node),
+        nodeId: node.id,
+        page,
+        pageSize,
+        gene: params.gene,
+        peak: params.peak,
+        minScore: params.minScore,
+      });
+      const items = normalizeFullLinkItems(response.items);
+      allItems.push(...items);
+      total = response.total;
+      if (allItems.length >= total) break;
+      page++;
+    }
+    downloadLinksCsv(allItems, filename);
+  } catch (e) {
+    console.error("Failed to download all regulatory links:", e);
+  }
 }
 
 function downloadLinksCsv(rows: GraphLink[], filename: string) {
   const header = [
     "peak",
     "linkedGene",
-    "group",
     "distanceToTss",
     "linkScore",
     "correlation",
@@ -2094,7 +2062,6 @@ function downloadLinksCsv(rows: GraphLink[], filename: string) {
   const csvRows = rows.map((row) => [
     row.peak,
     row.geneSymbol,
-    row.group ?? "",
     row.distanceToTss ?? "",
     row.linkScore ?? row.score ?? "",
     row.correlation ?? "",
@@ -2137,16 +2104,13 @@ defineExpose({
   --detail-teal-hover: #7f9a90;
   --detail-teal-active: #6f887d;
   --detail-teal-border: var(--nav-active-border);
-  --graph-gene: #f8e8c9;
-  --graph-gene-border: #e6a23c;
-  --graph-peak: #e2e8f0;
-  --graph-peak-border: #94a3b8;
-  --graph-group: #d4f1ea;
-  --graph-group-border: #168c7c;
-  --graph-tf: #ece7f8;
-  --graph-tf-border: #8b7ab8;
+  --graph-gene: #B11D56;
+  --graph-gene-border: #B11D56;
+  --graph-gene-alt: #11A3B8;
+  --graph-peak: #F59ABB;
+  --graph-peak-border: #F59ABB;
+  --graph-peak-alt: #8FD9E5;
   --graph-edge: rgba(71, 85, 105, 0.58);
-  --graph-marker-edge: rgba(22, 140, 124, 0.42);
   --el-color-primary: var(--detail-teal);
   position: relative;
   overflow: hidden;
@@ -2323,45 +2287,44 @@ defineExpose({
   font-weight: 900;
 }
 
-.peak-format-toast {
-  position: fixed;
-  left: 24px;
-  top: 16%;
-  transform: translateY(-50%);
-  z-index: 3000;
-  max-width: 340px;
-  padding: 12px 18px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(143, 174, 163, 0.36);
-  box-shadow: 0 8px 28px rgba(50, 102, 91, 0.14);
-  color: #173f38;
-  font-size: 13px;
-  font-weight: 750;
-  line-height: 1.5;
-}
-.peak-format-toast b {
-  color: #32665b;
-  font-weight: 950;
-}
-
-.peak-toast-slide-enter-active {
-  transition: opacity 0.28s ease, transform 0.28s ease;
-}
-.peak-toast-slide-leave-active {
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-.peak-toast-slide-enter-from {
-  opacity: 0;
-  transform: translateY(-50%) translateX(-24px);
-}
-.peak-toast-slide-leave-to {
-  opacity: 0;
-  transform: translateY(-50%) translateX(-12px);
-}
-
 .control-input {
   width: 100%;
+}
+
+.query-input-error {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 25px;
+  box-sizing: border-box;
+  padding: 5px 9px;
+  border: 1px solid rgba(190, 78, 78, 0.34);
+  border-radius: 8px;
+  background: rgba(255, 242, 242, 0.98);
+  color: #a43f3f;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.35;
+  box-shadow: 0 5px 13px rgba(143, 55, 55, 0.08);
+}
+
+.query-error-enter-active,
+.query-error-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.query-error-enter-from,
+.query-error-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.control-field--invalid :deep(.el-input__wrapper) {
+  background: #fffafa;
+  box-shadow:
+    0 0 0 1px rgba(190, 78, 78, 0.48) inset,
+    0 0 0 3px rgba(190, 78, 78, 0.08);
 }
 
 .query-panel :deep(.el-input__wrapper),
@@ -2567,7 +2530,14 @@ defineExpose({
   white-space: nowrap;
 }
 
+.legend-swatches {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .legend-dot {
+  flex: 0 0 auto;
   width: 8px;
   height: 8px;
   border: 1px solid rgba(95, 125, 112, 0.3);
@@ -2579,19 +2549,19 @@ defineExpose({
   border-color: var(--graph-gene-border);
 }
 
+.legend-dot--gene-alt {
+  background: var(--graph-gene-alt);
+  border-color: var(--graph-gene-alt);
+}
+
 .legend-dot--peak {
   background: var(--graph-peak);
   border-color: var(--graph-peak-border);
 }
 
-.legend-dot--group {
-  background: var(--graph-group);
-  border-color: var(--graph-group-border);
-}
-
-.legend-dot--tf {
-  background: var(--graph-tf);
-  border-color: var(--graph-tf-border);
+.legend-dot--peak-alt {
+  background: var(--graph-peak-alt);
+  border-color: var(--graph-peak-alt);
 }
 
 .legend-line {
@@ -2599,11 +2569,6 @@ defineExpose({
   width: 15px;
   height: 0;
   border-top: 1.5px solid var(--graph-edge);
-}
-
-.legend-line--marker {
-  border-top-style: dashed;
-  border-color: var(--graph-marker-edge);
 }
 
 .graph-body {
@@ -2834,7 +2799,7 @@ defineExpose({
   justify-content: center;
   min-height: 24px;
   padding: 5px 9px;
-  border: 1px solid rgba(143, 165, 156, 0.17);
+  border: 1.5px solid rgba(143, 165, 156, 0.17);
   border-radius: 999px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64);
   font-size: 12px;
@@ -2843,27 +2808,15 @@ defineExpose({
 }
 
 .inspector-chip--gene {
-  border-color: rgba(230, 162, 60, 0.26);
-  background: rgba(248, 232, 201, 0.5);
-  color: #5c4320;
+  border-color: rgba(177, 29, 86, 0.30);
+  background: rgba(177, 29, 86, 0.12);
+  color: #8a163f;
 }
 
 .inspector-chip--peak {
-  border-color: rgba(148, 163, 184, 0.3);
-  background: rgba(226, 232, 240, 0.48);
-  color: #475569;
-}
-
-.inspector-chip--group {
-  border-color: rgba(15, 118, 110, 0.22);
-  background: rgba(216, 243, 234, 0.52);
-  color: #0f4c45;
-}
-
-.inspector-chip--tf {
-  border-color: rgba(139, 122, 184, 0.26);
-  background: rgba(236, 231, 248, 0.52);
-  color: #5f5384;
+  border-color: rgba(245, 154, 187, 0.40);
+  background: rgba(245, 154, 187, 0.18);
+  color: #9b4a63;
 }
 
 .inspector-chip--edge {
@@ -3115,6 +3068,180 @@ defineExpose({
 
 :deep(.detail-table .detail-table-row--related td.el-table__cell) {
   background: rgba(216, 243, 234, 0.42) !important;
+}
+
+.network-peak-link {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  min-height: 20px;
+  margin: 0;
+  padding: 0 4px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #237b76;
+  cursor: pointer;
+  font: inherit;
+  font-size: inherit;
+  font-weight: 800;
+  line-height: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.network-peak-link:hover {
+  background: color-mix(in srgb, var(--nav-active-bg) 52%, transparent);
+  color: #6f887d;
+  box-shadow: 0 0 0 1px var(--nav-active-border) inset;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.network-peak-link:focus-visible {
+  outline: 2px solid var(--nav-active-border);
+  outline-offset: 2px;
+}
+
+:global(.network-peak-detail-popper.el-popover.el-popper) {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-brand);
+  border-radius: 14px;
+  box-shadow: 0 18px 42px rgba(18, 24, 38, 0.18);
+}
+
+.network-peak-card {
+  background: var(--surface);
+}
+
+.network-peak-card-head {
+  padding: 15px 16px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--nav-active-bg), #ffffff);
+}
+
+.network-peak-card-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.network-peak-kicker {
+  color: var(--brand-primary-3);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.network-peak-detail-button {
+  appearance: none;
+  padding: 5px 16px;
+  border: 1px solid var(--brand-primary-3);
+  border-radius: 999px;
+  background: var(--brand-primary-3);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.network-peak-detail-button:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.network-peak-detail-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.network-peak-title {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.network-peak-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.network-peak-pill {
+  max-width: 100%;
+  padding: 5px 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #ffffffc9;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.network-peak-card-body {
+  padding: 14px 16px 16px;
+}
+
+.network-peak-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.network-peak-grid > div,
+.network-peak-metrics > div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.network-peak-grid-wide {
+  grid-column: 1 / -1;
+}
+
+.network-peak-grid span,
+.network-peak-metrics span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.network-peak-grid strong,
+.network-peak-metrics strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.network-peak-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+  text-align: center;
 }
 
 .empty-state,

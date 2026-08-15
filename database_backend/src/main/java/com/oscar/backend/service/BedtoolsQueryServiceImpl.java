@@ -50,7 +50,9 @@ public class BedtoolsQueryServiceImpl implements BedtoolsQueryService {
             BedtoolsAnnotationType.GENE,
             BedtoolsAnnotationType.TRANSCRIPT,
             BedtoolsAnnotationType.TSS_PROMOTER,
-            BedtoolsAnnotationType.TF_ANNOTATION
+            BedtoolsAnnotationType.TF_ANNOTATION,
+            BedtoolsAnnotationType.TF_CHIP_SEQ,
+            BedtoolsAnnotationType.TCOF
     );
 
     private final BedtoolsProperties bedtoolsProperties;
@@ -176,6 +178,207 @@ public class BedtoolsQueryServiceImpl implements BedtoolsQueryService {
         return response;
     }
 
+    @Override
+    public BedtoolsIntersectResponse referenceIntersect(String genomeBuild, BedtoolsIntersectRequest request) {
+        return referenceIntersect(genomeBuild, request, false);
+    }
+
+    @Override
+    public BedtoolsIntersectResponse referenceIntersectAll(String genomeBuild, BedtoolsIntersectRequest request) {
+        return referenceIntersect(genomeBuild, request, true);
+    }
+
+    @Override
+    public BedtoolsIntersectResponse referenceIntersectAll(
+            String genomeBuild,
+            List<ReferenceQueryRegion> queryRegions,
+            String annotationType
+    ) {
+        long startedAt = System.nanoTime();
+        String normalizedGenomeBuild = normalizeOptionalSegment(
+                genomeBuild, DEFAULT_GENOME_BUILD, true, "genomeBuild");
+        List<BedtoolsAnnotationType> annotationTypes = normalizeAnnotationTypes(
+                List.of(annotationType), normalizedGenomeBuild);
+        BedtoolsAnnotationType type = annotationTypes.get(0);
+        if ("sample".equals(type.scope())) {
+            throw new BedtoolsQueryException(
+                    "TRACK_NOT_AVAILABLE",
+                    type.sourceLabel() + " requires a datasetId. Use the dataset-scoped intersect endpoint.",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        if (queryRegions == null || queryRegions.isEmpty()) {
+            throw new BedtoolsQueryException(
+                    "INVALID_REGION",
+                    "At least one query region is required.",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        Map<String, BedtoolsQueryRegion> parsedRegions = new LinkedHashMap<>();
+        for (ReferenceQueryRegion query : queryRegions) {
+            String id = query == null ? null : query.id();
+            if (id == null || id.isBlank() || parsedRegions.containsKey(id)) {
+                throw new BedtoolsQueryException(
+                        "INVALID_REGION",
+                        "Every batched query region must have a unique non-empty id.",
+                        HttpStatus.BAD_REQUEST
+                );
+            }
+            parsedRegions.put(id, regionParser.parse(
+                    query.region(), bedtoolsProperties.getBedtools().getMaxRegionBp()));
+        }
+
+        BedtoolsTrackResolver.ResolvedTrack track = trackResolver.resolveForIntersect(
+                type, "_reference", "reference", normalizedGenomeBuild);
+        List<String> warnings = new ArrayList<>();
+        Path queryBed = null;
+        List<BedtoolsRawOverlap> rawOverlaps;
+        try {
+            queryBed = writeQueryBed(parsedRegions);
+            List<String> lines = bedtoolsRunner.intersectRegions(queryBed, track.path());
+            rawOverlaps = parseBatchedBedtoolsOutput(track, parsedRegions, lines, 1, warnings);
+        } finally {
+            if (queryBed != null) deleteQuietly(queryBed);
+        }
+
+        List<BedtoolsOverlapRecord> hydrated = new ArrayList<>(resultHydrator.hydrate(
+                rawOverlaps, "_reference", "reference", normalizedGenomeBuild));
+        hydrated.sort(Comparator
+                .comparing((BedtoolsOverlapRecord record) -> nullToEmpty(record.getQueryRegion()))
+                .thenComparing(recordComparator()));
+
+        long total = hydrated.size();
+        BedtoolsIntersectSummary summary = new BedtoolsIntersectSummary();
+        summary.setTotalHits(total);
+        summary.setByAnnotationType(countByAnnotationType(annotationTypes, hydrated));
+        summary.setElapsedMillis((System.nanoTime() - startedAt) / 1_000_000L);
+
+        BedtoolsIntersectResponse response = new BedtoolsIntersectResponse();
+        response.setStatus(STATUS_SUCCESS);
+        response.setMessage("OK");
+        response.setDatasetId(null);
+        response.setDomain("reference");
+        response.setGenomeBuild(normalizedGenomeBuild);
+        response.setCoordinateSystem(COORDINATE_SYSTEM);
+        response.setSelectedAnnotationTypes(List.of(type.value()));
+        response.setPage(1);
+        response.setPageSize(hydrated.size());
+        response.setTotal(total);
+        response.setSummary(summary);
+        response.setRecords(hydrated);
+        response.setWarnings(warnings);
+        return response;
+    }
+
+    private BedtoolsIntersectResponse referenceIntersect(
+            String genomeBuild,
+            BedtoolsIntersectRequest request,
+            boolean returnAll
+    ) {
+        long startedAt = System.nanoTime();
+        String normalizedGenomeBuild = normalizeOptionalSegment(
+                genomeBuild,
+                DEFAULT_GENOME_BUILD,
+                true,
+                "genomeBuild"
+        );
+        BedtoolsQueryRegion queryRegion = regionParser.parse(
+                request == null ? null : request.getRegion(),
+                bedtoolsProperties.getBedtools().getMaxRegionBp()
+        );
+        List<BedtoolsAnnotationType> annotationTypes = normalizeAnnotationTypes(
+                request == null ? null : request.getAnnotationTypes(),
+                normalizedGenomeBuild
+        );
+        // Block sample-track types — reference intersect only supports reference annotation types.
+        for (BedtoolsAnnotationType type : annotationTypes) {
+            if ("sample".equals(type.scope())) {
+                throw new BedtoolsQueryException(
+                        "TRACK_NOT_AVAILABLE",
+                        type.sourceLabel() + " requires a datasetId. Use the dataset-scoped intersect endpoint.",
+                        org.springframework.http.HttpStatus.BAD_REQUEST
+                );
+            }
+        }
+        int minOverlapBp = normalizeMinOverlap(request == null ? null : request.getMinOverlapBp());
+        int page = returnAll ? 1 : normalizePage(request == null ? null : request.getPage());
+        int pageSize = returnAll ? Integer.MAX_VALUE : normalizePageSize(request == null ? null : request.getPageSize());
+
+        // Use sentinel values for datasetId/domain — resolveForIntersect and hydrate
+        // only use them for sample tracks, which are blocked above.
+        String sentinelDatasetId = "_reference";
+        String sentinelDomain = "reference";
+        List<BedtoolsTrackResolver.ResolvedTrack> tracks = annotationTypes
+                .stream()
+                .map(type -> trackResolver.resolveForIntersect(type, sentinelDatasetId, sentinelDomain, normalizedGenomeBuild))
+                .toList();
+
+        Path queryBed = null;
+        List<String> warnings = Collections.synchronizedList(new ArrayList<>());
+        List<BedtoolsRawOverlap> rawOverlaps;
+        Path genomeFile = Paths.get(
+                bedtoolsProperties.getBedtools().getReferenceRoot(),
+                normalizedGenomeBuild,
+                "fasta",
+                "genome.fa.fai"
+        ).toAbsolutePath().normalize();
+        try {
+            queryBed = writeQueryBed(queryRegion);
+            Path finalQueryBed = queryBed;
+            rawOverlaps = tracks.parallelStream()
+                    .flatMap(track -> {
+                        List<String> lines = bedtoolsRunner.intersect(finalQueryBed, track.path(), genomeFile, queryRegion);
+                        return parseBedtoolsOutput(track, queryRegion, lines, minOverlapBp, warnings).stream();
+                    })
+                    .collect(Collectors.toList());
+        } finally {
+            if (queryBed != null) {
+                deleteQuietly(queryBed);
+            }
+        }
+
+        List<BedtoolsOverlapRecord> hydrated = new ArrayList<>(resultHydrator.hydrate(
+                rawOverlaps,
+                sentinelDatasetId,
+                sentinelDomain,
+                normalizedGenomeBuild
+        ));
+        hydrated.sort(recordComparator());
+
+        long total = hydrated.size();
+        List<BedtoolsOverlapRecord> pageRecords;
+        if (returnAll) {
+            pageRecords = hydrated;
+        } else {
+            int fromIndex = Math.min((page - 1) * pageSize, hydrated.size());
+            int toIndex = Math.min(fromIndex + pageSize, hydrated.size());
+            pageRecords = hydrated.subList(fromIndex, toIndex);
+        }
+
+        BedtoolsIntersectSummary summary = new BedtoolsIntersectSummary();
+        summary.setTotalHits(total);
+        summary.setByAnnotationType(countByAnnotationType(annotationTypes, hydrated));
+        summary.setElapsedMillis((System.nanoTime() - startedAt) / 1_000_000L);
+
+        BedtoolsIntersectResponse response = new BedtoolsIntersectResponse();
+        response.setStatus(STATUS_SUCCESS);
+        response.setMessage("OK");
+        response.setDatasetId(null);
+        response.setDomain(sentinelDomain);
+        response.setGenomeBuild(normalizedGenomeBuild);
+        response.setCoordinateSystem(COORDINATE_SYSTEM);
+        response.setQueryRegion(queryRegion);
+        response.setSelectedAnnotationTypes(annotationTypes.stream().map(BedtoolsAnnotationType::value).toList());
+        response.setPage(page);
+        response.setPageSize(returnAll ? hydrated.size() : pageSize);
+        response.setTotal(total);
+        response.setSummary(summary);
+        response.setRecords(pageRecords);
+        response.setWarnings(warnings);
+        return response;
+    }
+
     private Path writeQueryBed(BedtoolsQueryRegion region) {
         Path tmpRoot = Paths.get(bedtoolsProperties.getBedtools().getTmpRoot()).toAbsolutePath().normalize();
         try {
@@ -204,6 +407,70 @@ public class BedtoolsQueryServiceImpl implements BedtoolsQueryService {
                     HttpStatus.INTERNAL_SERVER_ERROR
             );
         }
+    }
+
+    private Path writeQueryBed(Map<String, BedtoolsQueryRegion> regions) {
+        Path tmpRoot = Paths.get(bedtoolsProperties.getBedtools().getTmpRoot()).toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(tmpRoot);
+            Path queryBed = Files.createTempFile(tmpRoot, "oscar-bedtools-batch-", ".bed");
+            try (BufferedWriter writer = Files.newBufferedWriter(
+                    queryBed,
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE
+            )) {
+                for (Map.Entry<String, BedtoolsQueryRegion> entry : regions.entrySet()) {
+                    BedtoolsQueryRegion region = entry.getValue();
+                    writer.write(String.join(
+                            "\t",
+                            region.getChrom(),
+                            Long.toString(region.getStart()),
+                            Long.toString(region.getEnd()),
+                            entry.getKey()
+                    ));
+                    writer.write('\n');
+                }
+            }
+            return queryBed;
+        } catch (IOException exception) {
+            throw new BedtoolsQueryException(
+                    "BEDTOOLS_ERROR",
+                    "failed to create batched query BED: " + exception.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    private List<BedtoolsRawOverlap> parseBatchedBedtoolsOutput(
+            BedtoolsTrackResolver.ResolvedTrack track,
+            Map<String, BedtoolsQueryRegion> queryRegions,
+            List<String> lines,
+            int minOverlapBp,
+            List<String> warnings
+    ) {
+        List<BedtoolsRawOverlap> overlaps = new ArrayList<>();
+        for (String line : lines) {
+            if (line == null || line.isBlank()) continue;
+            String[] columns = line.split("\t", 5);
+            if (columns.length < 5) {
+                warnings.add("Skipped malformed batched bedtools row for " + track.type().value() + ".");
+                continue;
+            }
+            String queryId = columns[3];
+            BedtoolsQueryRegion queryRegion = queryRegions.get(queryId);
+            if (queryRegion == null) {
+                warnings.add("Skipped bedtools row with an unknown batched query id.");
+                continue;
+            }
+            List<BedtoolsRawOverlap> parsed = parseBedtoolsOutput(
+                    track, queryRegion, List.of(line), minOverlapBp, warnings);
+            for (BedtoolsRawOverlap raw : parsed) {
+                raw.setQueryRegion(queryId);
+                overlaps.add(raw);
+            }
+        }
+        return overlaps;
     }
 
     private List<BedtoolsRawOverlap> parseBedtoolsOutput(

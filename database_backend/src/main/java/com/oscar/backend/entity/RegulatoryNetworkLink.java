@@ -15,10 +15,6 @@ public class RegulatoryNetworkLink {
     private Double varQAtac;
     private Double varQRna;
     private Long distanceToTss;
-    private String group;
-    private String cellTypeGroup;
-    private String clusterGroup;
-    private String markerStatus;
     private String linkType;
     private String source;
     private String datasetId;
@@ -122,38 +118,6 @@ public class RegulatoryNetworkLink {
 
     public void setDistanceToTss(Long distanceToTss) {
         this.distanceToTss = distanceToTss;
-    }
-
-    public String getGroup() {
-        return group;
-    }
-
-    public void setGroup(String group) {
-        this.group = group;
-    }
-
-    public String getCellTypeGroup() {
-        return cellTypeGroup;
-    }
-
-    public void setCellTypeGroup(String cellTypeGroup) {
-        this.cellTypeGroup = cellTypeGroup;
-    }
-
-    public String getClusterGroup() {
-        return clusterGroup;
-    }
-
-    public void setClusterGroup(String clusterGroup) {
-        this.clusterGroup = clusterGroup;
-    }
-
-    public String getMarkerStatus() {
-        return markerStatus;
-    }
-
-    public void setMarkerStatus(String markerStatus) {
-        this.markerStatus = markerStatus;
     }
 
     public String getLinkType() {

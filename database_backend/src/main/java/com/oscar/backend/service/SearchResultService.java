@@ -5,6 +5,9 @@ import com.oscar.backend.entity.SearchResultOverviewResponse;
 import com.oscar.backend.entity.SearchResultQcViolinResponse;
 import com.oscar.backend.entity.SearchResultUmapResponse;
 
+import java.io.IOException;
+import java.io.OutputStream;
+
 public interface SearchResultService {
 
     SearchResultOverviewResponse getOverview(String datasetId);
@@ -14,4 +17,7 @@ public interface SearchResultService {
     SearchResultQcViolinResponse getQcViolin(String datasetId, String domain, String groupBy, String metrics);
 
     SearchResultUmapResponse getUmap(String datasetId, String domain, String embedding, String colorBy, Integer maxPoints);
+
+    void writeFullUmapCsv(String datasetId, String domain, String embedding, String colorBy, OutputStream outputStream)
+            throws IOException;
 }

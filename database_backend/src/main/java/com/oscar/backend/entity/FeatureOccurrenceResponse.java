@@ -8,6 +8,11 @@ public class FeatureOccurrenceResponse {
     private String featureType;
     private String featureId;
     private String domain;
+    // gene-level genomic context
+    private String genomeBuild;
+    private String geneBodyRegion;
+    private String promoterRegion;
+    private List<GeneEnhancerSummary> enhancerSummaries = new ArrayList<>();
     private int datasetCount;
     private int cellTypeCount;
     private int clusterCount;
@@ -26,6 +31,14 @@ public class FeatureOccurrenceResponse {
     public void setFeatureId(String featureId) { this.featureId = featureId; }
     public String getDomain() { return domain; }
     public void setDomain(String domain) { this.domain = domain; }
+    public String getGenomeBuild() { return genomeBuild; }
+    public void setGenomeBuild(String v) { this.genomeBuild = v; }
+    public String getGeneBodyRegion() { return geneBodyRegion; }
+    public void setGeneBodyRegion(String v) { this.geneBodyRegion = v; }
+    public String getPromoterRegion() { return promoterRegion; }
+    public void setPromoterRegion(String v) { this.promoterRegion = v; }
+    public List<GeneEnhancerSummary> getEnhancerSummaries() { return enhancerSummaries; }
+    public void setEnhancerSummaries(List<GeneEnhancerSummary> v) { this.enhancerSummaries = v; }
     public int getDatasetCount() { return datasetCount; }
     public void setDatasetCount(int datasetCount) { this.datasetCount = datasetCount; }
     public int getCellTypeCount() { return cellTypeCount; }
@@ -84,11 +97,14 @@ public class FeatureOccurrenceResponse {
 
     public static class DatasetRankingItem {
         private String datasetId;
+        private String sampleName;
         private int recordCount;
         private int cellContextCount;
         private int clusterCount;
         public String getDatasetId() { return datasetId; }
         public void setDatasetId(String datasetId) { this.datasetId = datasetId; }
+        public String getSampleName() { return sampleName; }
+        public void setSampleName(String sampleName) { this.sampleName = sampleName; }
         public int getRecordCount() { return recordCount; }
         public void setRecordCount(int recordCount) { this.recordCount = recordCount; }
         public int getCellContextCount() { return cellContextCount; }
@@ -110,5 +126,26 @@ public class FeatureOccurrenceResponse {
         public void setDatasetCount(int datasetCount) { this.datasetCount = datasetCount; }
         public int getClusterCount() { return clusterCount; }
         public void setClusterCount(int clusterCount) { this.clusterCount = clusterCount; }
+    }
+
+    public static class GeneEnhancerSummary {
+        private String enhancerType;   // SE or TE
+        private String label;          // Super enhancer / Typical enhancer
+        private int matchedRegionCount;
+        private int biosampleCount;
+        private List<String> exampleBiosamples = new ArrayList<>();
+        private List<String> exampleRegions = new ArrayList<>();
+        public String getEnhancerType() { return enhancerType; }
+        public void setEnhancerType(String v) { this.enhancerType = v; }
+        public String getLabel() { return label; }
+        public void setLabel(String v) { this.label = v; }
+        public int getMatchedRegionCount() { return matchedRegionCount; }
+        public void setMatchedRegionCount(int v) { this.matchedRegionCount = v; }
+        public int getBiosampleCount() { return biosampleCount; }
+        public void setBiosampleCount(int v) { this.biosampleCount = v; }
+        public List<String> getExampleBiosamples() { return exampleBiosamples; }
+        public void setExampleBiosamples(List<String> v) { this.exampleBiosamples = v; }
+        public List<String> getExampleRegions() { return exampleRegions; }
+        public void setExampleRegions(List<String> v) { this.exampleRegions = v; }
     }
 }

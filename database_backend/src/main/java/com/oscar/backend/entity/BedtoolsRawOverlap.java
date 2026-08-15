@@ -8,6 +8,7 @@ public class BedtoolsRawOverlap {
     private String annotationType;
     private String scope;
     private String featureId;
+    private String queryRegion;
     private String featureChrom;
     private Long featureStart;
     private Long featureEnd;
@@ -38,6 +39,14 @@ public class BedtoolsRawOverlap {
 
     public void setFeatureId(String featureId) {
         this.featureId = featureId;
+    }
+
+    public String getQueryRegion() {
+        return queryRegion;
+    }
+
+    public void setQueryRegion(String queryRegion) {
+        this.queryRegion = queryRegion;
     }
 
     public String getFeatureChrom() {

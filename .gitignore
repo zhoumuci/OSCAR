@@ -19,3 +19,59 @@ database_backend/src/main/resources/db/migration/
 CLAUDE.md
 
 oscar.code-workspace
+# Deployment archives
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+
+# Deployment archives
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+
+# YAML configuration files
+*.yml
+*.yaml
+
+# ==============================
+# Runtime / deployment configs
+# ==============================
+
+# Environment variables
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Spring / YAML configs
+*.yml
+*.yaml
+
+# Vite config
+vite.config.*
+**/vite.config.*
+
+# Docker / deployment configs
+Dockerfile
+**/Dockerfile
+docker-compose*
+**/docker-compose*
+
+# Common server configs
+*.conf
+
+# Deployment archives
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+
+# Local data / intermediate files
+ArchR_all_gene_annotation.tsv
+H_000533_summary.csv
+H_000533_umap_celltypes.csv
+missing_genes.txt
+update_gene_coordinates_hg38.sql
+convert_references.sh

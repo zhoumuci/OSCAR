@@ -12,9 +12,7 @@ public interface RegulatoryNetworkService {
             String mode,
             String gene,
             String peak,
-            String groupBy,
             Double minScore,
-            Integer maxDistance,
             Integer maxNodes,
             Integer maxEdges
     );
@@ -24,9 +22,9 @@ public interface RegulatoryNetworkService {
             String domain,
             String nodeId,
             String nodeType,
-            String groupBy,
+            String gene,
+            String peak,
             Double minScore,
-            Integer maxDistance,
             Integer maxNeighbors
     );
 
@@ -37,7 +35,8 @@ public interface RegulatoryNetworkService {
             String nodeId,
             Integer page,
             Integer pageSize,
-            Double minScore,
-            String groupBy
+            String gene,
+            String peak,
+            Double minScore
     );
 }

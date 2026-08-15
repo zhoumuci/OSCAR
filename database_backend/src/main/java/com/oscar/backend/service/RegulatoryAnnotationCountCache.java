@@ -109,7 +109,9 @@ public class RegulatoryAnnotationCountCache {
             String contextCluster,
             String regionType,
             Double maxFdr,
-            Double minLog2fc
+            Double minLog2fc,
+            Double minP2gScore,
+            String signalType
     ) {
     }
 

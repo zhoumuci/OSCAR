@@ -29,7 +29,7 @@ public class BedtoolsProperties {
         private String tmpRoot = "/data/oscar/tmp/bedtools";
         private String binaryPath = "/usr/bin/bedtools";
         private long maxRegionBp = 5_000_000L;
-        private long timeoutSeconds = 120L;
+        private long timeoutSeconds = 3_600L;
 
         public String getReferenceRoot() {
             return referenceRoot;

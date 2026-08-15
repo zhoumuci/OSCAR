@@ -1,8 +1,8 @@
 <template>
   <div class="sr-page">
     <div class="container">
-      <div class="page-title">Search Result</div>
-      <div class="page-sub">Welcome to our database to search for the data you need.</div>
+      <div class="page-title">Sample details</div>
+      <div class="page-sub">Explore single-cell multi-omics profiles and regulatory annotations for this sample.</div>
 
       <div class="float-card hint-card">
         <div class="hint-left">
@@ -11,10 +11,15 @@
             <span v-for="c in queryChips" :key="c" class="qchip">{{ c }}</span>
           </div>
         </div>
-        <div class="data-view-switch" role="radiogroup" aria-label="Data view">
+        <div ref="switchRef" class="data-view-switch" role="radiogroup" aria-label="Data view">
+          <div
+            class="data-view-slider"
+            :style="sliderStyle"
+          />
           <button
-            v-for="option in dataViewOptions"
+            v-for="(option, idx) in dataViewOptions"
             :key="option.value"
+            :ref="(el) => { if (el) btnRefs[idx] = el as HTMLElement }"
             type="button"
             class="data-view-button"
             :class="{ active: selectedDomain === option.value }"
@@ -25,19 +30,15 @@
           </button>
         </div>
         <div class="hint-right">
-          <el-button class="btn" @click="goBackToSearch">Back to Search</el-button>
+          <el-button class="btn" @click="goBack">{{ backLabel }}</el-button>
         </div>
       </div>
 
-      <div v-if="state === 'loading'" class="float-card block">
-        <el-skeleton animated :rows="10" />
-      </div>
-
-      <div v-else-if="state === 'idle'" class="float-card block state-box">
+      <div v-if="state === 'idle'" class="float-card block state-box">
         <div class="state-title">No query provided</div>
         <div class="state-msg">Sorry, you did not submit the query content, can not query data information for you..</div>
         <div class="state-actions">
-          <el-button type="primary" @click="goBackToSearch">Back to Search</el-button>
+          <el-button type="primary" @click="goBack">{{ backLabel }}</el-button>
         </div>
       </div>
 
@@ -46,7 +47,7 @@
         <div class="state-msg">{{ errorMsg }}</div>
         <div class="state-actions">
           <el-button type="primary" @click="load">Retry</el-button>
-          <el-button class="btn" @click="goBackToSearch">Back to Search</el-button>
+          <el-button class="btn" @click="goBack">{{ backLabel }}</el-button>
         </div>
       </div>
 
@@ -58,51 +59,56 @@
           :error="overviewError"
         />
 
-        <SampleLandscapeSection :dataset-id="datasetId" :domain="selectedDomain" />
-
-        <RegulatoryAnnotationSection
+        <SampleLandscapeSection
           :dataset-id="datasetId"
           :domain="selectedDomain"
-          :overview="overviewData"
-          :demo-mode="demoMode"
-          :demo-size="demoSize"
+          :prefetch-enabled="state === 'ready'"
         />
 
-        <component :is="domainExtraComp" :payload="payload" />
+        <div class="deferred-sections-anchor">
+          <Suspense v-if="deferredSectionsEnabled">
+            <div>
+              <RegulatoryAnnotationSection
+                :dataset-id="datasetId"
+                :domain="selectedDomain"
+                :overview="overviewData"
+              />
 
-        <RegulatoryNetworkSection
-          v-if="showRegulatoryNetwork"
-          :dataset-id="datasetId"
-          :domain="selectedDomain"
-          :demo-mode="demoMode"
-          :demo-size="demoSize"
-        />
+              <RegulatoryNetworkSection
+                v-if="showRegulatoryNetwork"
+                :dataset-id="datasetId"
+                :domain="selectedDomain"
+              />
+            </div>
+            <template #fallback>
+              <div class="float-card deferred-loading-card" role="status" aria-live="polite">
+                <div class="deferred-loading-title">Loading regulatory sections…</div>
+                <el-skeleton animated :rows="4" />
+              </div>
+            </template>
+          </Suspense>
+          <div v-else class="float-card deferred-loading-card deferred-loading-card--queued" role="status" aria-live="polite">
+            <div class="deferred-loading-title">Preparing regulatory sections…</div>
+            <el-skeleton animated :rows="3" />
+          </div>
+        </div>
       </template>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { SearchResultDomain, SearchResultOverviewData } from "@/api/searchResult";
 import { fetchSearchResultOverview } from "@/api/searchResult";
 
-import IntegrationExtra from "@/components/IntegrationResult.vue";
-import RNAExtra from "@/components/RNAResult.vue";
-import ATACExtra from "@/components/ATACResult.vue";
 import SearchResultOverview from "@/components/search-result/SearchResultOverview.vue";
 import SampleLandscapeSection from "@/components/search-result/SampleLandscapeSection.vue";
-import RegulatoryAnnotationSection from "@/components/search-result/MarkerGenesSection.vue";
-import RegulatoryNetworkSection from "@/components/search-result/RegulatoryNetworkSection.vue";
-import { normalizeDemoDataSize, type DemoDataSize } from "@/mock/searchResultDemoData";
+const RegulatoryAnnotationSection = defineAsyncComponent(() => import("@/components/search-result/MarkerGenesSection.vue"));
+const RegulatoryNetworkSection = defineAsyncComponent(() => import("@/components/search-result/RegulatoryNetworkSection.vue"));
 
 type DataViewDomain = SearchResultDomain;
-
-type Payload = {
-  domain: DataViewDomain;
-  primaryId?: string;
-};
 
 type ViewState = "idle" | "loading" | "ready" | "error";
 
@@ -121,14 +127,37 @@ const selectedDomain = computed<DataViewDomain>(() => {
   return "integration";
 });
 
-const demoMode = computed(() => {
-  const queryDemo = String(route.query.demo || "").toLowerCase();
-  const envDemo = String(import.meta.env.VITE_OSCAR_DEMO_DATA || "").toLowerCase();
+// ---- domain switch slider animation ----
+const switchRef = ref<HTMLElement | null>(null);
+const btnRefs = ref<Record<number, HTMLElement>>({});
+const sliderStyle = ref<Record<string, string>>({ width: "0px", transform: "translateX(0px)" });
 
-  return queryDemo === "1" || queryDemo === "true" || envDemo === "true";
+function updateSlider() {
+  const idx = dataViewOptions.findIndex((o) => o.value === selectedDomain.value);
+  const el = btnRefs.value[idx];
+  const container = switchRef.value;
+  if (!el || !container) return;
+  const containerRect = container.getBoundingClientRect();
+  const btnRect = el.getBoundingClientRect();
+  sliderStyle.value = {
+    width: `${btnRect.width}px`,
+    transform: `translateX(${btnRect.left - containerRect.left}px)`,
+  };
+}
+
+watch(selectedDomain, () => nextTick(updateSlider));
+let domainSwitchResizeObserver: ResizeObserver | null = null;
+onMounted(() => {
+  nextTick(updateSlider);
+  if (switchRef.value) {
+    domainSwitchResizeObserver = new ResizeObserver(updateSlider);
+    domainSwitchResizeObserver.observe(switchRef.value);
+  }
 });
 
-const demoSize = computed<DemoDataSize>(() => normalizeDemoDataSize(route.query.demoSize));
+
+
+
 
 const primaryIdFromQuery = computed(() => {
   // Temporary local development fallback until every entry route passes datasetId.
@@ -138,7 +167,7 @@ const primaryIdFromQuery = computed(() => {
 
 const datasetId = computed(() => primaryIdFromQuery.value);
 
-const state = ref<ViewState>("idle");
+const state = ref<ViewState>("loading");
 const errorMsg = ref<string>("");
 const errorCode = ref<number | null>(null);
 const overviewData = ref<SearchResultOverviewData | null>(null);
@@ -151,12 +180,18 @@ const errorTitle = computed(() => {
   return "Request Failed";
 });
 
-const payload = computed<Payload>(() => ({
-  domain: selectedDomain.value,
-  primaryId: datasetId.value,
-}));
-
 const showRegulatoryNetwork = computed(() => selectedDomain.value === "integration");
+
+const deferredSectionsEnabled = ref(false);
+
+function enableDeferredSections() {
+  if (deferredSectionsEnabled.value) return;
+  deferredSectionsEnabled.value = true;
+}
+
+function resetDeferredSections() {
+  deferredSectionsEnabled.value = false;
+}
 
 const queryChips = computed(() => {
   const q = route.query;
@@ -166,15 +201,20 @@ const queryChips = computed(() => {
   if (q.field) chips.push(`field=${String(q.field)}`);
   if (q.q) chips.push(`q=${String(q.q)}`);
   if (q.id) chips.push(`id=${String(q.id)}`);
-  if (demoMode.value) chips.push("demo=1");
-  if (demoMode.value) chips.push(`demoSize=${demoSize.value}`);
   if (chips.length === 0) chips.push("id=H_000001");
   return chips;
 });
 
-function goBackToSearch() {
-  router.push({ path: "/search" });
-}
+const backSource = computed(() => (route.query.source as string) || "browse");
+const backLabel = computed(() => {
+  const map: Record<string, string> = { analysis: "Back to Analysis", search: "Back to Search", home: "Back to Home", browse: "Back to Browse", download: "Back to Download" };
+  return map[backSource.value] || "Back";
+});
+const backPath = computed(() => {
+  const map: Record<string, string> = { analysis: "/analysis", search: "/search", home: "/", browse: "/browse", download: "/download" };
+  return map[backSource.value] || "/browse";
+});
+function goBack() { router.push(backPath.value); }
 
 function setSelectedDomain(nextDomain: DataViewDomain) {
   if (String(route.query.domain || "").toLowerCase() === nextDomain) return;
@@ -187,15 +227,6 @@ function setSelectedDomain(nextDomain: DataViewDomain) {
     },
   });
 }
-
-const domainExtraComp = computed(() => {
-  const map: Record<DataViewDomain, any> = {
-    integration: IntegrationExtra,
-    rna: RNAExtra,
-    atac: ATACExtra,
-  };
-  return map[selectedDomain.value];
-});
 
 let loadToken = 0;
 
@@ -222,12 +253,25 @@ async function load() {
     if (myToken === loadToken) {
       overviewLoading.value = false;
       state.value = "ready";
+      await nextTick();
+      enableDeferredSections();
     }
   }
 }
 
-onMounted(load);
-watch(datasetId, () => load());
+onMounted(() => {
+  void load();
+});
+watch(datasetId, () => {
+  resetDeferredSections();
+  void load();
+});
+
+onBeforeUnmount(() => {
+  ++loadToken;
+  domainSwitchResizeObserver?.disconnect();
+  domainSwitchResizeObserver = null;
+});
 </script>
 
 <style scoped>
@@ -240,6 +284,28 @@ watch(datasetId, () => load());
   width: 100%;
   padding: 18px 0 10px;
   background: var(--bg);
+}
+
+.deferred-sections-anchor {
+  min-height: 1px;
+}
+
+.deferred-loading-card {
+  min-height: 168px;
+  padding: 18px;
+  margin-bottom: 14px;
+  background: var(--surface);
+}
+
+.deferred-loading-card--queued {
+  opacity: 0.82;
+}
+
+.deferred-loading-title {
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
 }
 
 .page-title {
@@ -285,6 +351,7 @@ watch(datasetId, () => load());
 
 .hint-title {
   font-weight: 900;
+  font-size: 18px;
   margin-bottom: 6px;
 }
 
@@ -304,21 +371,42 @@ watch(datasetId, () => load());
 }
 
 .data-view-switch {
+  position: relative;
   display: inline-flex;
   justify-self: center;
   align-items: center;
-  gap: 6px;
-  min-height: 46px;
-  padding: 5px;
+  gap: 4px;
+  min-height: 44px;
+  padding: 4px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: #ffffffd9;
   box-shadow:
     inset 0 1px 0 #ffffffcc,
-    0 8px 18px #1218260f;
+    0 6px 16px #1218260d;
+}
+
+.data-view-slider {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  height: calc(100% - 8px);
+  border-radius: 999px;
+  background: var(--nav-active-bg);
+  border: 1px solid var(--nav-active-border);
+  box-shadow:
+    inset 0 1px 0 #ffffff9c,
+    0 4px 12px rgba(95, 125, 112, 0.20);
+  transition:
+    transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1),
+    width 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .data-view-button {
+  position: relative;
+  z-index: 1;
   appearance: none;
   border: 1px solid transparent;
   border-radius: 999px;
@@ -326,32 +414,21 @@ watch(datasetId, () => load());
   color: var(--muted);
   cursor: pointer;
   font: inherit;
-  min-height: 36px;
+  min-height: 34px;
   font-size: 15px;
   font-weight: 800;
   line-height: 1;
-  padding: 9px 20px;
+  padding: 8px 20px;
   transition:
-    background-color 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    color 0.18s ease,
-    transform 0.18s ease;
+    color 0.22s ease;
 }
 
 .data-view-button:hover {
-  background: var(--surface-2);
-  border-color: var(--border-brand);
   color: var(--text);
 }
 
 .data-view-button.active {
-  background: var(--nav-active-bg);
-  border-color: var(--nav-active-border);
   color: var(--nav-active-text);
-  box-shadow:
-    inset 0 1px 0 #ffffff9c,
-    0 6px 14px rgba(95, 125, 112, 0.18);
 }
 
 .data-view-button:focus-visible {
@@ -441,5 +518,9 @@ watch(datasetId, () => load());
   .hint-right {
     justify-content: flex-start;
   }
+}
+@media (max-width: 480px) {
+  .hint-card { gap: 10px; padding: 12px; }
+  .hint-chips { flex-wrap: wrap; }
 }
 </style>

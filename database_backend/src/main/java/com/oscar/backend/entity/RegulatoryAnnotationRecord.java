@@ -4,6 +4,9 @@ public class RegulatoryAnnotationRecord {
 
     private String id;
     private String annotationType;
+    private String signalType;
+    private Double varQrna;
+    private Double varQatac;
     private String datasetId;
     private String domain;
     private String context;
@@ -79,6 +82,19 @@ public class RegulatoryAnnotationRecord {
     public void setAnnotationType(String annotationType) {
         this.annotationType = annotationType;
     }
+
+    public String getSignalType() {
+        return signalType;
+    }
+
+    public void setSignalType(String signalType) {
+        this.signalType = signalType;
+    }
+
+    public Double getVarQrna() { return varQrna; }
+    public void setVarQrna(Double varQrna) { this.varQrna = varQrna; }
+    public Double getVarQatac() { return varQatac; }
+    public void setVarQatac(Double varQatac) { this.varQatac = varQatac; }
 
     public String getDatasetId() {
         return datasetId;

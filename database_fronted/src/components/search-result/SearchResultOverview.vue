@@ -20,16 +20,15 @@
       </div>
 
       <div class="overview-download-panel">
-        <a
-          v-if="downloadUrl"
+        <button
+          v-if="downloadRow"
           class="overview-download-button"
-          :href="downloadUrl"
-          target="_blank"
-          rel="noopener"
+          type="button"
+          @click="openDownloadDialog"
         >
           <span class="download-label">Download</span>
-          <span class="download-sub">Open sample resources</span>
-        </a>
+          <span class="download-sub">Open sample files</span>
+        </button>
 
         <button v-else class="overview-download-button disabled" type="button" disabled>
           <span class="download-label">No download</span>
@@ -39,12 +38,16 @@
     </div>
 
     <div v-if="error" class="overview-note">Overview data is currently unavailable.</div>
+    <DownloadFilesDialog v-model="downloadDialogOpen" :row="downloadRow" />
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
+import { buildDownloads } from "@/api/download";
+import type { DownloadRow } from "@/api/download";
 import type { SearchResultOverviewData } from "@/api/searchResult";
+import DownloadFilesDialog from "@/components/download/DownloadFilesDialog.vue";
 
 const props = defineProps<{
   datasetId: string;
@@ -73,7 +76,29 @@ const visibleItems = computed<OverviewDisplayItem[]>(() => {
   ];
 });
 
-const downloadUrl = computed(() => props.overview?.downloadUrl?.trim() || "");
+const downloadDialogOpen = ref(false);
+
+const downloadRow = computed<DownloadRow | null>(() => {
+  const datasetId = formatValue(props.overview?.datasetId || props.datasetId);
+  if (datasetId === "-") return null;
+  return {
+    datasetId,
+    sampleType: formatValue(props.overview?.sampleType),
+    tissue: formatValue(props.overview?.tissue),
+    sampleName: formatValue(props.overview?.sampleName),
+    cells: numericValue(props.overview?.cells ?? props.overview?.sampleNumber),
+    platform: formatValue(props.overview?.platform),
+    sourceId: formatValue(props.overview?.sourceId),
+    disease: formatValue(props.overview?.disease),
+    sampleSource: formatValue(props.overview?.sampleSource),
+    downloads: buildDownloads(datasetId),
+  };
+});
+
+function openDownloadDialog() {
+  if (!downloadRow.value) return;
+  downloadDialogOpen.value = true;
+}
 
 function formatValue(value: unknown): string {
   const normalizedValue = String(value ?? "").trim();
@@ -82,6 +107,11 @@ function formatValue(value: unknown): string {
 
 function formatNumber(value: number | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? value.toLocaleString() : "-";
+}
+
+function numericValue(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 </script>
@@ -175,6 +205,8 @@ function formatNumber(value: number | undefined): string {
 }
 
 .overview-download-button {
+  -webkit-appearance: none;
+  appearance: none;
   position: relative;
   z-index: 0;
   isolation: isolate;
@@ -187,12 +219,14 @@ function formatNumber(value: number | undefined): string {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  border: 1px solid #8fa59c80;
+  border: 1px solid var(--nav-active-border);
   border-radius: 15px;
-  background: linear-gradient(135deg, #8fa59c 0%, #a6bab1 54%, #c6d4ce 100%);
+  background: var(--nav-active-bg);
   background-clip: padding-box;
-  color: var(--text);
-  box-shadow: inset 0 1px 0 #ffffff73, inset 0 -1px 0 #1b2a2714;
+  color: var(--nav-active-text);
+  box-shadow:
+    inset 0 1px 0 #ffffff9c,
+    0 4px 12px rgba(95, 125, 112, 0.16);
   cursor: pointer;
   text-align: center;
   transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
@@ -200,8 +234,10 @@ function formatNumber(value: number | undefined): string {
 
 .overview-download-button:hover {
   transform: translateY(-2px);
-  box-shadow: inset 0 1px 0 #ffffff8c, inset 0 -1px 0 #1b2a271f;
-  filter: saturate(1.06);
+  box-shadow:
+    inset 0 1px 0 #ffffffb8,
+    0 7px 16px rgba(95, 125, 112, 0.20);
+  filter: saturate(1.03);
 }
 
 .overview-download-button.disabled {

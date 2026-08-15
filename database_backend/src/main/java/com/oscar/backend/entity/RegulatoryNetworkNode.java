@@ -7,15 +7,9 @@ public class RegulatoryNetworkNode {
     private String id;
     private String type;
     private String label;
-    private String markerStatus;
-    private String group;
     private String chromosome;
     private Long start;
     private Long end;
-    private Double markerScore;
-    private Integer markerRank;
-    private Long cellCount;
-    private Double proportion;
     private Double fdr;
     private Double varQAtac;
     private Double varQRna;
@@ -58,22 +52,6 @@ public class RegulatoryNetworkNode {
         this.label = label;
     }
 
-    public String getMarkerStatus() {
-        return markerStatus;
-    }
-
-    public void setMarkerStatus(String markerStatus) {
-        this.markerStatus = markerStatus;
-    }
-
-    public String getGroup() {
-        return group;
-    }
-
-    public void setGroup(String group) {
-        this.group = group;
-    }
-
     public String getChromosome() {
         return chromosome;
     }
@@ -96,38 +74,6 @@ public class RegulatoryNetworkNode {
 
     public void setEnd(Long end) {
         this.end = end;
-    }
-
-    public Double getMarkerScore() {
-        return markerScore;
-    }
-
-    public void setMarkerScore(Double markerScore) {
-        this.markerScore = markerScore;
-    }
-
-    public Integer getMarkerRank() {
-        return markerRank;
-    }
-
-    public void setMarkerRank(Integer markerRank) {
-        this.markerRank = markerRank;
-    }
-
-    public Long getCellCount() {
-        return cellCount;
-    }
-
-    public void setCellCount(Long cellCount) {
-        this.cellCount = cellCount;
-    }
-
-    public Double getProportion() {
-        return proportion;
-    }
-
-    public void setProportion(Double proportion) {
-        this.proportion = proportion;
     }
 
     public Double getFdr() {

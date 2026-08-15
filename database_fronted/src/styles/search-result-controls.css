@@ -111,6 +111,7 @@
 }
 
 .oscar-select-popper .el-select-dropdown__item.is-selected {
-  background: var(--nav-active-bg) !important;
-  color: var(--nav-active-text) !important;
+  background: var(--brand-primary-3) !important;
+  color: #fff !important;
+  font-weight: 900;
 }

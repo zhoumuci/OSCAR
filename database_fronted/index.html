@@ -2,9 +2,47 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/png" href="./images/mark.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>database_cons</title>
+    <title>OSCAR</title>
+    <style>
+      #app:empty {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background: #fbfcfb;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      #app:empty::before {
+        content: "OSCAR";
+        color: #8fa59c;
+        font-size: 42px;
+        font-weight: 900;
+        letter-spacing: 1px;
+      }
+      #app:empty::after {
+        content: "";
+        width: 148px;
+        height: 3px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #dfe8e4 0%, #8fa59c 45%, #dfe8e4 100%);
+        background-size: 220% 100%;
+        animation: oscar-app-loading 1.05s ease-in-out infinite;
+      }
+      @keyframes oscar-app-loading {
+        0% { background-position: 0% 50%; }
+        100% { background-position: 220% 50%; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #app:empty::after {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>

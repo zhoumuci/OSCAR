@@ -18,6 +18,7 @@ const props = defineProps<{
   data: CellTypeCompositionData | null;
   loading: boolean;
   error: boolean;
+  groupLabel?: string;
 }>();
 
 const chartEl = ref<HTMLElement | null>(null);
@@ -59,6 +60,7 @@ async function renderChart() {
 
   currentChart.setOption(
     {
+      animation: false,
       color: colors,
       tooltip: {
         trigger: "item",
@@ -72,7 +74,7 @@ async function renderChart() {
       },
       series: [
         {
-          name: "Cell type",
+          name: props.groupLabel || "Cell type",
           type: "pie",
           radius: ["42%", "70%"],
           center: ["50%", "43%"],
@@ -113,7 +115,7 @@ function downloadImage(filename: string, options?: ChartDownloadOptions) {
 
 defineExpose({ downloadImage });
 
-watch(() => [props.data, props.loading, props.error], renderChart, { deep: true, flush: "post" });
+watch(() => [props.data, props.loading, props.error], renderChart, { flush: "post" });
 onMounted(renderChart);
 onBeforeUnmount(disposeChart);
 </script>

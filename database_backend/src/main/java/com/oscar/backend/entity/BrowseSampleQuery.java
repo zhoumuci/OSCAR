@@ -12,6 +12,8 @@ public class BrowseSampleQuery {
     private String tissue;
     private Integer page = DEFAULT_PAGE;
     private Integer pageSize = DEFAULT_PAGE_SIZE;
+    private String sortBy;
+    private String sortDir;
 
     public void normalize() {
         keyword = trimToNull(keyword);
@@ -28,6 +30,36 @@ public class BrowseSampleQuery {
         } else if (pageSize > MAX_PAGE_SIZE) {
             pageSize = MAX_PAGE_SIZE;
         }
+
+        // Only allow whitelisted sort columns and directions
+        sortBy = normalizeSortBy(sortBy);
+        sortDir = normalizeSortDir(sortDir);
+    }
+
+    public String getSortColumn() {
+        return "cells".equals(sortBy) ? "cell_count" : "dataset_id";
+    }
+
+    public String getSortDirection() {
+        return "desc".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
+    }
+
+    private String normalizeSortBy(String value) {
+        String trimmed = trimToNull(value);
+        if (trimmed == null) return "datasetId";
+        return switch (trimmed.toLowerCase()) {
+            case "cells", "cell_count" -> "cells";
+            default -> "datasetId";
+        };
+    }
+
+    private String normalizeSortDir(String value) {
+        String trimmed = trimToNull(value);
+        if (trimmed == null) return "asc";
+        return switch (trimmed.toLowerCase()) {
+            case "desc", "descending", "descend" -> "desc";
+            default -> "asc";
+        };
     }
 
     public int getOffset() {
@@ -91,5 +123,21 @@ public class BrowseSampleQuery {
 
     public void setPageSize(Integer pageSize) {
         this.pageSize = pageSize;
+    }
+
+    public String getSortBy() {
+        return sortBy;
+    }
+
+    public void setSortBy(String sortBy) {
+        this.sortBy = sortBy;
+    }
+
+    public String getSortDir() {
+        return sortDir;
+    }
+
+    public void setSortDir(String sortDir) {
+        this.sortDir = sortDir;
     }
 }

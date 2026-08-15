@@ -10,17 +10,24 @@ const routes: RouteRecordRaw[] = [
   { path: "/search", component: () => import("@/views/SearchView.vue") },
   { path: "/analysis", component: () => import("@/views/AnalysisView.vue") },
   { path: "/download", component: () => import("@/views/DownloadView.vue") },
-  { path: "/stats", component: HomeView },
   { path: "/contact", component: () => import("@/views/ContactView.vue") },
-  { path: "/help", component: HomeView },
+  { path: "/helps", component: () => import("@/views/HelpView.vue") },
   {
-    path: "/search/result",
-    name: "SearchResult",
+    path: "/sample/:id",
+    name: "SampleDetail",
     component: () => import("@/views/SearchResultView.vue"),
   },
   {
+    path: "/search/result",
+    redirect: (to) => ({
+      name: "SampleDetail",
+      params: { id: String(to.query.id || "H_000001") },
+      query: { domain: String(to.query.domain || "integration"), source: "search" },
+    }),
+  },
+  {
     path: "/search-result/:id",
-    component: () => import("@/views/SearchResultView.vue"),
+    redirect: (to) => `/sample/${to.params.id}`,
   },
   {
     path: "/feature-detail",
@@ -29,8 +36,10 @@ const routes: RouteRecordRaw[] = [
   },
 ];
 
+const base = import.meta.env.VITE_PUBLIC_BASE || '/';
+
 export const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(base),
   routes,
   scrollBehavior() {
     return { top: 0 };

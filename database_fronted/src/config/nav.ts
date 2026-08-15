@@ -6,7 +6,6 @@ export const NAV_ITEMS: NavItem[] = [
     { name: "Search", path: "/search" },
     { name: "Analysis", path: "/analysis" },
     { name: "Download", path: "/download" },
-    { name: "Statistics", path: "/stats" },
     { name: "Contact", path: "/contact" },
-    { name: "Help", path: "/help" },
+    { name: "Help", path: "/helps" },
   ];

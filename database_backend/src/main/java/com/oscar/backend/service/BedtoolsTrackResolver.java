@@ -34,7 +34,14 @@ public class BedtoolsTrackResolver {
             BedtoolsAnnotationType.ENHANCER,
             BedtoolsAnnotationType.SUPER_ENHANCER,
             BedtoolsAnnotationType.METHYLATION,
-            BedtoolsAnnotationType.CRISPR
+            BedtoolsAnnotationType.CRISPR,
+            BedtoolsAnnotationType.ATAC_PEAKS,
+            BedtoolsAnnotationType.GENOMIC_3D,
+            BedtoolsAnnotationType.DNASE_PEAKS,
+            BedtoolsAnnotationType.TAD,
+            BedtoolsAnnotationType.ERNA,
+            BedtoolsAnnotationType.TF_CHIP_SEQ,
+            BedtoolsAnnotationType.TCOF
     );
 
     private final BedtoolsProperties bedtoolsProperties;
@@ -74,6 +81,23 @@ public class BedtoolsTrackResolver {
             sources.add(regulatoryReferenceSource(type, genomeBuild));
         }
 
+        sources.add(new BedtoolsSourceOption(
+                BedtoolsAnnotationType.TF_ANNOTATION.value(),
+                BedtoolsAnnotationType.TF_ANNOTATION.sourceLabel(),
+                BedtoolsAnnotationType.TF_ANNOTATION.scope(),
+                false,
+                STATUS_NOT_AVAILABLE,
+                "TF annotation data have not been integrated yet.",
+                null
+        ));
+        return sources;
+    }
+
+    public List<BedtoolsSourceOption> listReferenceSources(String genomeBuild) {
+        List<BedtoolsSourceOption> sources = new ArrayList<>();
+        for (BedtoolsAnnotationType type : REGULATORY_REFERENCE_TYPES) {
+            sources.add(regulatoryReferenceSource(type, genomeBuild));
+        }
         sources.add(new BedtoolsSourceOption(
                 BedtoolsAnnotationType.TF_ANNOTATION.value(),
                 BedtoolsAnnotationType.TF_ANNOTATION.sourceLabel(),

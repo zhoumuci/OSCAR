@@ -27,9 +27,7 @@ public class RegulatoryNetworkController {
             @RequestParam String mode,
             @RequestParam(required = false) String gene,
             @RequestParam(required = false) String peak,
-            @RequestParam(required = false) String groupBy,
             @RequestParam(required = false) Double minScore,
-            @RequestParam(required = false) Integer maxDistance,
             @RequestParam(required = false) Integer maxNodes,
             @RequestParam(required = false) Integer maxEdges
     ) {
@@ -39,9 +37,7 @@ public class RegulatoryNetworkController {
                 mode,
                 gene,
                 peak,
-                groupBy,
                 minScore,
-                maxDistance,
                 maxNodes,
                 maxEdges
         );
@@ -53,9 +49,9 @@ public class RegulatoryNetworkController {
             @RequestParam String domain,
             @RequestParam String nodeId,
             @RequestParam String nodeType,
-            @RequestParam(required = false) String groupBy,
+            @RequestParam(required = false) String gene,
+            @RequestParam(required = false) String peak,
             @RequestParam(required = false) Double minScore,
-            @RequestParam(required = false) Integer maxDistance,
             @RequestParam(required = false) Integer maxNeighbors
     ) {
         return regulatoryNetworkService.expandRegulatoryNetwork(
@@ -63,9 +59,9 @@ public class RegulatoryNetworkController {
                 domain,
                 nodeId,
                 nodeType,
-                groupBy,
+                gene,
+                peak,
                 minScore,
-                maxDistance,
                 maxNeighbors
         );
     }
@@ -78,8 +74,9 @@ public class RegulatoryNetworkController {
             @RequestParam String nodeId,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer pageSize,
-            @RequestParam(required = false) Double minScore,
-            @RequestParam(required = false) String groupBy
+            @RequestParam(required = false) String gene,
+            @RequestParam(required = false) String peak,
+            @RequestParam(required = false) Double minScore
     ) {
         return regulatoryNetworkService.getRegulatoryNetworkLinks(
                 datasetId,
@@ -88,8 +85,9 @@ public class RegulatoryNetworkController {
                 nodeId,
                 page,
                 pageSize,
-                minScore,
-                groupBy
+                gene,
+                peak,
+                minScore
         );
     }
 }

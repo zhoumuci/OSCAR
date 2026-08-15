@@ -3,13 +3,37 @@
     <div class="container">
       <div class="db-layout">
         <aside class="left" v-loading="facetLoading && viewState === 'ready'">
+          <!-- Active filters -->
+          <div v-if="activeFilters.length > 0" class="active-filters">
+            <span class="af-label">Active filters:</span>
+            <span
+              v-for="f in activeFilters"
+              :key="f.label"
+              class="af-chip"
+            >
+              <span class="af-chip-key">{{ f.key }}</span>
+              <span class="af-chip-val">{{ f.label }}</span>
+              <button type="button" class="af-chip-x" @click="onSelectFacet(f.facetKey, f.label)">&times;</button>
+            </span>
+            <button type="button" class="af-clear" @click="clearAllFilters">Clear all</button>
+          </div>
+
+          <!-- Species info chip (display-only, single species) -->
+          <div v-if="showSpeciesChip" class="species-info">
+            <div class="species-icon">🧬</div>
+            <div class="species-text">
+              <span class="species-label">Species</span>
+              <span class="species-value">{{ facets.species[0]?.label ?? 'Homo sapiens' }}</span>
+            </div>
+          </div>
+
           <FacetCard
-            v-for="panel in facetPanels"
+            v-for="panel in visiblePanels"
             :key="panel.key"
             :title="panel.title"
             :items="facets[panel.key]"
             :selected="filters[panel.key]"
-            @select="(label) => onSelectFacet(panel.key, label)"
+            @select="(label: string) => onSelectFacet(panel.key, label)"
           />
         </aside>
 
@@ -43,17 +67,17 @@
 
           <template v-else>
             <el-table
-              v-loading="sampleLoading"
               :data="rows"
               stripe
               border
               class="tbl"
+              @sort-change="onTableSortChange"
             >
-              <el-table-column label="DatasetID" min-width="140" fixed>
+              <el-table-column prop="datasetId" label="DatasetID" min-width="140" fixed sortable="custom">
                 <template #default="{ row }">
                   <el-link
                     type="primary"
-                    :underline="false"
+                    underline="never"
                     class="dataset-link"
                     @click="openDataset(row.datasetId)"
                   >
@@ -62,18 +86,18 @@
                 </template>
               </el-table-column>
 
-              <el-table-column prop="sampleType" label="Sample Type" min-width="150" show-overflow-tooltip />
-              <el-table-column prop="tissue" label="Tissue" min-width="130" show-overflow-tooltip />
-              <el-table-column prop="sampleName" label="Sample Name" min-width="160" show-overflow-tooltip />
-              <el-table-column label="Cells" min-width="110" align="center">
+              <el-table-column prop="sampleType" label="Sample Type" min-width="120" />
+              <el-table-column prop="tissue" label="Tissue" min-width="100" />
+              <el-table-column prop="sampleName" label="Sample Name" min-width="180" sortable="custom" />
+              <el-table-column prop="cells" label="Cells" min-width="110" align="center" sortable="custom">
                 <template #default="{ row }">
                   {{ formatCells(row.cells) }}
                 </template>
               </el-table-column>
-              <el-table-column prop="platform" label="Platform" min-width="150" show-overflow-tooltip />
-              <el-table-column prop="sourceId" label="SourceID" min-width="160" show-overflow-tooltip />
-              <el-table-column prop="disease" label="Disease" min-width="140" show-overflow-tooltip />
-              <el-table-column prop="sampleSource" label="Sample Source" min-width="160" show-overflow-tooltip />
+              <el-table-column prop="platform" label="Platform" min-width="120" sortable="custom" />
+              <el-table-column prop="sourceId" label="SourceID" min-width="120" sortable="custom" />
+              <el-table-column prop="disease" label="Disease" min-width="110" sortable="custom" />
+              <el-table-column prop="sampleSource" label="Sample Source" min-width="150" sortable="custom" />
             </el-table>
 
             <div v-if="!sampleLoading && rows.length === 0" class="table-empty">
@@ -98,8 +122,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import type {
   BrowseFacetKey,
   BrowseFacetQuery,
@@ -113,6 +137,7 @@ import FacetCard from "@/components/FacetCard.vue";
 type ViewState = "loading" | "ready" | "error";
 
 const router = useRouter();
+const route = useRoute();
 
 const facetPanels: Array<{ key: BrowseFacetKey; title: string }> = [
   { key: "species", title: "Species" },
@@ -122,15 +147,51 @@ const facetPanels: Array<{ key: BrowseFacetKey; title: string }> = [
 
 const keyword = ref("");
 const page = ref(1);
-const pageSize = ref(20);
+const pageSize = ref(10);
 const total = ref(0);
 const rows = ref<BrowseSample[]>([]);
+const sortBy = ref("datasetId");
+const sortDir = ref<"asc" | "desc">("asc");
 
 const filters = reactive<Record<BrowseFacetKey, string>>({
   species: "",
   sampleType: "",
   tissue: "",
 });
+
+const activeFilters = computed(() => {
+  const result: Array<{ facetKey: BrowseFacetKey; key: string; label: string }> = [];
+  const keyLabels: Record<BrowseFacetKey, string> = {
+    species: "Species",
+    sampleType: "Sample Type",
+    tissue: "Tissue",
+  };
+  for (const panel of facetPanels) {
+    const val = filters[panel.key];
+    if (val) result.push({ facetKey: panel.key, key: keyLabels[panel.key] ?? panel.key, label: val });
+  }
+  return result;
+});
+
+const showSpeciesChip = computed(() => {
+  const items = facets.species;
+  return items.length === 1;
+});
+
+const visiblePanels = computed(() => {
+  return facetPanels.filter((panel) => {
+    if (panel.key === "species") return !showSpeciesChip.value; // hide if chip, show if multi
+    return true;
+  });
+});
+
+function clearAllFilters() {
+  filters.species = "";
+  filters.sampleType = "";
+  filters.tissue = "";
+  page.value = 1;
+  loadBrowseData();
+}
 
 const facets = reactive<BrowseFacetResponse>({
   species: [],
@@ -166,6 +227,8 @@ function currentSampleQuery(): BrowseSampleQuery {
     ...currentFacetQuery(),
     page: page.value,
     pageSize: pageSize.value,
+    sortBy: sortBy.value,
+    sortDir: sortDir.value,
   };
 }
 
@@ -267,10 +330,30 @@ function onSearch() {
   loadBrowseData();
 }
 
+// Auto-search when user clears the search box
+watch(keyword, (newVal, oldVal) => {
+  if (oldVal.trim() && !newVal.trim()) {
+    page.value = 1;
+    loadBrowseData();
+  }
+});
+
 function onSelectFacet(facet: BrowseFacetKey, label: string) {
   filters[facet] = filters[facet] === label ? "" : label;
   page.value = 1;
   loadBrowseData();
+}
+
+function onTableSortChange({ prop, order }: { prop: string; order: string | null }) {
+  if (order) {
+    sortBy.value = prop;
+    sortDir.value = order === "descending" ? "desc" : "asc";
+  } else {
+    sortBy.value = "datasetId";
+    sortDir.value = "asc";
+  }
+  page.value = 1;
+  loadSamplesOnly();
 }
 
 function onPageChange(nextPage: number) {
@@ -282,12 +365,9 @@ function openDataset(datasetId: string) {
   if (!datasetId) return;
 
   router.push({
-    name: "SearchResult",
-    query: {
-      mode: "id",
-      domain: "integration",
-      id: datasetId,
-    },
+    name: "SampleDetail",
+    params: { id: datasetId },
+    query: { domain: "integration", source: "browse" },
   });
 }
 
@@ -300,6 +380,14 @@ function formatCells(value: number | null | undefined) {
 }
 
 onMounted(() => {
+  const q = route.query;
+  if (q.keyword) keyword.value = String(q.keyword);
+  if (q.facet && q.facetValue) {
+    const facetKey = String(q.facet);
+    if (facetKey === "tissue" || facetKey === "sampleType") {
+      filters[facetKey] = String(q.facetValue);
+    }
+  }
   loadBrowseData();
 });
 </script>
@@ -336,10 +424,115 @@ onMounted(() => {
   top: 88px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
   max-height: calc(100vh - 108px);
   overflow-y: auto;
   padding-right: 4px;
+}
+
+/* ── Active filters ─────────────────────────── */
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.af-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+  margin-right: 2px;
+}
+
+.af-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--border-brand);
+  border-radius: 999px;
+  background: #f4f8f6;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.af-chip-key {
+  color: var(--muted);
+}
+
+.af-chip-val {
+  color: var(--text);
+}
+
+.af-chip-x {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.af-chip-x:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.af-clear {
+  border: none;
+  background: transparent;
+  color: var(--brand-primary-3);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.af-clear:hover {
+  background: var(--surface-3);
+}
+
+/* ── Species info chip ──────────────────────── */
+.species-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #f6f9f7, var(--surface));
+  border: 1px solid rgba(80, 100, 90, 0.16);
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(31, 48, 42, 0.06);
+}
+
+.species-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.species-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.species-label {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.species-value {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--text);
 }
 
 .left::-webkit-scrollbar {
@@ -465,23 +658,27 @@ onMounted(() => {
 .tbl {
   border-radius: 14px;
   overflow: hidden;
+  position: relative;
 }
 
 :deep(.tbl th.el-table__cell),
 :deep(.tbl td.el-table__cell) {
   text-align: center;
   vertical-align: middle;
-  padding: 10px 0;
+  padding: 10px 8px;
+  white-space: nowrap;
 }
 
-:deep(.tbl th.el-table__cell > .cell),
-:deep(.tbl td.el-table__cell > .cell) {
+:deep(.tbl th.el-table__cell.is-sortable .cell) {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  min-height: 24px;
-  line-height: 1.35;
-  text-align: center;
+  white-space: nowrap;
+}
+
+:deep(.tbl th.el-table__cell.is-sortable .caret-wrapper) {
+  flex: 0 0 auto;
 }
 
 .dataset-link {
@@ -594,5 +791,9 @@ onMounted(() => {
     overflow: visible;
     padding-right: 0;
   }
+}
+@media (max-width: 480px) {
+  .search-row { grid-template-columns: 1fr; gap: 8px; }
+  .search-label { width: 100%; }
 }
 </style>

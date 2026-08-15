@@ -2,10 +2,19 @@
     /* ===== Brand: 主色（你给的色卡） ===== */
     --brand-primary:   #A6BAB1;  /* ling lü */
     --brand-primary-2: #C6D4CE;  /* 更浅一档（hover/浅底） */
-    --brand-primary-3: #8FA59C;  /* 更深一档（强调/边框） */
-  
+    --brand-primary-3: #8FA59C;  /* 更深一档（强调/边框） — 翠涛 */
+
     /* 深墨（文字） */
     --brand-ink: #1B2A27;
+
+    /* Element Plus 主题色覆盖 — 干掉默认蓝 */
+    --el-color-primary:       var(--brand-primary-3);
+    --el-color-primary-light-3: var(--brand-primary-2);
+    --el-color-primary-light-5: var(--brand-primary-2);
+    --el-color-primary-light-7: var(--brand-primary);
+    --el-color-primary-light-8: var(--brand-primary);
+    --el-color-primary-light-9: var(--brand-primary);
+    --el-color-primary-dark-2:  #7F9A90;
   
     /* ===== Page / Surface ===== */
     --bg:        #FBFCFB;        /* 页面背景：干净白 */
