@@ -4,7 +4,7 @@
 >
 > OSCAR is a human single-cell multi-omics platform for paired RNA-seq and ATAC-seq data.
 
-![Figure 1](img/Figure1_sc_revise.tif)
+![Figure 1](img/Figure1_sc_revise.png)
 
 ---
 
