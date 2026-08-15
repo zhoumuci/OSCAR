@@ -1,4 +1,3 @@
-.claude/
 
 .idea/
 
@@ -13,10 +12,6 @@ scripts/
 database_backend/src/main/resources/db/migration/
 
 .env
-
-123
-
-CLAUDE.md
 
 oscar.code-workspace
 # Deployment archives
