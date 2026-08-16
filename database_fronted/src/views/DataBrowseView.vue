@@ -86,8 +86,8 @@
                 </template>
               </el-table-column>
 
-              <el-table-column prop="sampleType" label="Sample Type" min-width="120" />
-              <el-table-column prop="tissue" label="Tissue" min-width="100" />
+              <el-table-column prop="sampleType" label="Sample Type" min-width="120" sortable="custom" />
+              <el-table-column prop="tissue" label="Tissue" min-width="100" sortable="custom" />
               <el-table-column prop="sampleName" label="Sample Name" min-width="180" sortable="custom" />
               <el-table-column prop="cells" label="Cells" min-width="110" align="center" sortable="custom">
                 <template #default="{ row }">
@@ -124,6 +124,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import axios from "axios";
 import type {
   BrowseFacetKey,
   BrowseFacetQuery,
@@ -245,12 +246,20 @@ function applySamples(data: { records: BrowseSample[]; total: number; page: numb
   pageSize.value = data.pageSize || pageSize.value;
 }
 
-function clearBrowseData() {
+function clearRows() {
   rows.value = [];
   total.value = 0;
+}
+
+function clearFacets() {
   facets.species = [];
   facets.sampleType = [];
   facets.tissue = [];
+}
+
+function clearBrowseData() {
+  clearRows();
+  clearFacets();
 }
 
 function getErrorStatus(error: unknown): number | null {
@@ -301,6 +310,8 @@ async function loadBrowseData() {
     applySamples(sampleData);
     viewState.value = "ready";
   } catch (error) {
+    // 被 axios 去重拦截器取消的请求不是错误：新请求会正常回填数据
+    if (axios.isCancel(error)) return;
     clearBrowseData();
     setError(error);
   } finally {
@@ -318,7 +329,10 @@ async function loadSamplesOnly() {
     applySamples(await fetchBrowseSamples(currentSampleQuery()));
     viewState.value = "ready";
   } catch (error) {
-    clearBrowseData();
+    // 被 axios 去重拦截器取消的请求不是错误：新请求会正常回填数据
+    if (axios.isCancel(error)) return;
+    // 只清表格数据：facets 不属于本函数的职责范围，保持上次成功的结果
+    clearRows();
     setError(error);
   } finally {
     sampleLoading.value = false;

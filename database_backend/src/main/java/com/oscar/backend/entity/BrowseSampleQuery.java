@@ -37,7 +37,18 @@ public class BrowseSampleQuery {
     }
 
     public String getSortColumn() {
-        return "cells".equals(sortBy) ? "cell_count" : "dataset_id";
+        return switch (sortBy) {
+            case "cells" -> "cell_count";
+            case "sampleName" -> "sample_name";
+            case "sampleType" -> "sample_type";
+            case "tissue" -> "tissue";
+            case "platform" -> "platform";
+            case "sourceId" -> "source_id";
+            case "disease" -> "disease";
+            case "sampleSource" -> "sample_source";
+            // dataset_id 为定长零填充格式（H_000001），文本序即数值序
+            default -> "dataset_id";
+        };
     }
 
     public String getSortDirection() {
@@ -49,6 +60,13 @@ public class BrowseSampleQuery {
         if (trimmed == null) return "datasetId";
         return switch (trimmed.toLowerCase()) {
             case "cells", "cell_count" -> "cells";
+            case "samplename", "sample_name" -> "sampleName";
+            case "sampletype", "sample_type" -> "sampleType";
+            case "tissue" -> "tissue";
+            case "platform" -> "platform";
+            case "sourceid", "source_id" -> "sourceId";
+            case "disease" -> "disease";
+            case "samplesource", "sample_source" -> "sampleSource";
             default -> "datasetId";
         };
     }

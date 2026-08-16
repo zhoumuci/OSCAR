@@ -57,7 +57,7 @@ public interface BrowseMapper {
             "WHERE (is_deleted IS NULL OR is_deleted = 0)",
             "AND (is_visible IS NULL OR is_visible = 1)",
             BROWSE_FILTERS,
-            "ORDER BY ${sortColumn} ${sortDirection}",
+            "ORDER BY ${sortColumn} ${sortDirection}, dataset_id ASC",
             "LIMIT #{pageSize} OFFSET #{offset}",
             "</script>"
     })
