@@ -111,7 +111,8 @@ public class RegulatoryAnnotationCountCache {
             Double maxFdr,
             Double minLog2fc,
             Double minP2gScore,
-            String signalType
+            String signalType,
+            String p2gMode
     ) {
     }
 

@@ -40,7 +40,7 @@ public class SearchController {
 
     @PostMapping("/cell-type")
     public GeneSearchResponse searchByCellType(@RequestBody CellTypeSearchRequest request) {
-        return searchService.searchByCellType(request.getCellType());
+        return searchService.searchByCellType(request.getCellType(), request.getTissue());
     }
 
     @GetMapping("/cell-types")

@@ -104,9 +104,9 @@
           class="chart-download-button chart-download-button--qc"
           type="button"
           :disabled="!canDownloadQc"
-          :title="canDownloadQc ? 'Download chart as PNG' : 'Chart image unavailable'"
+          :title="canDownloadQc ? 'Download chart image' : 'Chart image unavailable'"
           :aria-label="`Download ${datasetId} QC distribution chart`"
-          @click.stop="downloadQcChart"
+          @click.stop="qcDownloadDialogOpen = true"
         >
           <el-icon><Download /></el-icon>
         </button>
@@ -176,6 +176,38 @@
         <button
           type="button"
           class="landscape-download-chip"
+          :class="{ 'landscape-download-chip--loading': activeDownloadAction === 'pdf' }"
+          :disabled="activeDownloadAction !== null"
+          @click="runLandscapeDownload('pdf', downloadDialogPdf)"
+        >
+          <span class="landscape-download-chip-left">
+            <span class="landscape-download-chip-name">Chart document</span>
+            <span class="landscape-download-chip-format">PDF</span>
+          </span>
+          <span class="landscape-download-chip-action" aria-live="polite">
+            <span v-if="activeDownloadAction === 'pdf'" class="landscape-download-spinner" aria-hidden="true" />
+            {{ activeDownloadAction === 'pdf' ? 'Starting...' : 'Download' }}
+          </span>
+        </button>
+        <button
+          type="button"
+          class="landscape-download-chip"
+          :class="{ 'landscape-download-chip--loading': activeDownloadAction === 'svg' }"
+          :disabled="activeDownloadAction !== null"
+          @click="runLandscapeDownload('svg', downloadDialogSvg)"
+        >
+          <span class="landscape-download-chip-left">
+            <span class="landscape-download-chip-name">Chart image</span>
+            <span class="landscape-download-chip-format">SVG · Vector</span>
+          </span>
+          <span class="landscape-download-chip-action" aria-live="polite">
+            <span v-if="activeDownloadAction === 'svg'" class="landscape-download-spinner" aria-hidden="true" />
+            {{ activeDownloadAction === 'svg' ? 'Starting...' : 'Download' }}
+          </span>
+        </button>
+        <button
+          type="button"
+          class="landscape-download-chip"
           :class="{ 'landscape-download-chip--loading': activeDownloadAction === 'table' }"
           :disabled="activeDownloadAction !== null"
           @click="runLandscapeDownload('table', downloadDialogTable)"
@@ -214,6 +246,15 @@
       <el-button @click="downloadDialogOpen = false">Close</el-button>
     </template>
   </el-dialog>
+
+  <ChartImageDownloadDialog
+    v-model="qcDownloadDialogOpen"
+    title="Download QC distribution"
+    :chart-label="selectedQcMetricTitle"
+    :download="downloadQcChart"
+    :include-pdf="true"
+    :download-pdf="downloadQcPdf"
+  />
 </template>
 
 <script setup lang="ts">
@@ -232,8 +273,10 @@ import { fetchCellTypeComposition, fetchQcViolin, fetchUmap } from "@/api/search
 import CellTypeCompositionChart from "@/components/search-result/CellTypeCompositionChart.vue";
 import QcViolinChart from "@/components/search-result/QcViolinChart.vue";
 import UmapChart from "@/components/search-result/UmapChart.vue";
+import ChartImageDownloadDialog from "@/components/ChartImageDownloadDialog.vue";
 import { buildApiUrl } from "@/config/api";
 import { downloadCsv } from "@/utils/downloadCsv";
+import type { ChartDownloadOptions } from "@/utils/downloadChart";
 import { domainDisplayLabel } from "@/utils/searchResultDomain";
 
 const props = defineProps<{
@@ -264,13 +307,15 @@ const selectedEmbedding = ref<SearchResultEmbedding>("umap");
 const selectedColorBy = ref<SearchResultColorBy>(props.domain === "integration" ? "celltype" : "cluster");
 const selectedQcMetric = ref<QcMetricKey>("TSSEnrichment");
 type LandscapeDownloadKind = "composition" | "umap";
-type LandscapeDownloadAction = "image" | "table" | "full";
+type LandscapeDownloadAction = "image" | "pdf" | "svg" | "table" | "full";
 const downloadDialogOpen = ref(false);
+const qcDownloadDialogOpen = ref(false);
 const downloadDialogKind = ref<LandscapeDownloadKind>("composition");
 const activeDownloadAction = ref<LandscapeDownloadAction | null>(null);
 
 type ChartExportHandle = {
-  downloadImage: (filename: string) => boolean;
+  downloadImage: (filename: string, options?: ChartDownloadOptions) => boolean;
+  downloadPdf: (filename: string, options?: Omit<ChartDownloadOptions, "type">) => boolean;
 };
 
 const compositionChartRef = ref<ChartExportHandle | null>(null);
@@ -348,6 +393,10 @@ const allQcMetricOptions: QcMetricOption[] = [
     domains: ["integration", "rna"],
   },
 ];
+const selectedQcMetricTitle = computed(() =>
+  allQcMetricOptions.find((option) => option.value === selectedQcMetric.value)?.title
+  ?? selectedQcMetric.value
+);
 
 const qcMetricOptions = computed(() => {
   return allQcMetricOptions.filter((option) => option.domains.includes(props.domain));
@@ -421,15 +470,31 @@ function showDownloadUnavailableMessage() {
   ElMessage.warning("Chart data is not ready yet.");
 }
 
-function triggerChartDownload(chartRef: ChartExportHandle | null, filename: string) {
-  if (!chartRef?.downloadImage(filename)) {
+function triggerChartDownload(
+  chartRef: ChartExportHandle | null,
+  filename: string,
+  options?: ChartDownloadOptions
+) {
+  if (!chartRef?.downloadImage(filename, options)) {
     showDownloadUnavailableMessage();
     return false;
   }
   return true;
 }
 
-function downloadCompositionChart() {
+function triggerChartPdfDownload(
+  chartRef: ChartExportHandle | null,
+  filename: string,
+  options?: Omit<ChartDownloadOptions, "type">
+) {
+  if (!chartRef?.downloadPdf(filename, options)) {
+    showDownloadUnavailableMessage();
+    return false;
+  }
+  return true;
+}
+
+function downloadCompositionChart(format: "png" | "svg" = "png") {
   if (!canDownloadComposition.value) {
     showDownloadUnavailableMessage();
     return false;
@@ -438,22 +503,54 @@ function downloadCompositionChart() {
   const datasetPart = sanitizeFilenamePart(props.datasetId);
   return triggerChartDownload(
     compositionChartRef.value,
-    `${datasetPart}_${compositionView.value}_composition.png`
+    `${datasetPart}_${compositionView.value}_composition.${format}`,
+    { type: format }
   );
 }
 
-function downloadQcChart() {
+function downloadQcChart(format: "png" | "svg") {
   if (!canDownloadQc.value) {
     showDownloadUnavailableMessage();
-    return;
+    return false;
   }
 
   const datasetPart = sanitizeFilenamePart(props.datasetId);
   const metricPart = sanitizeFilenamePart(selectedQcMetric.value);
-  triggerChartDownload(qcChartRef.value, `${datasetPart}_${metricPart}_qc_distribution.png`);
+  return triggerChartDownload(
+    qcChartRef.value,
+    `${datasetPart}_${metricPart}_qc_distribution.${format}`,
+    { type: format }
+  );
 }
 
-function downloadUmapChart() {
+function downloadCompositionPdf() {
+  if (!canDownloadComposition.value) {
+    showDownloadUnavailableMessage();
+    return false;
+  }
+
+  const datasetPart = sanitizeFilenamePart(props.datasetId);
+  return triggerChartPdfDownload(
+    compositionChartRef.value,
+    `${datasetPart}_${compositionView.value}_composition.pdf`
+  );
+}
+
+function downloadQcPdf() {
+  if (!canDownloadQc.value) {
+    showDownloadUnavailableMessage();
+    return false;
+  }
+
+  const datasetPart = sanitizeFilenamePart(props.datasetId);
+  const metricPart = sanitizeFilenamePart(selectedQcMetric.value);
+  return triggerChartPdfDownload(
+    qcChartRef.value,
+    `${datasetPart}_${metricPart}_qc_distribution.pdf`
+  );
+}
+
+function downloadUmapPdf() {
   if (!canDownloadUmap.value) {
     showDownloadUnavailableMessage();
     return false;
@@ -462,7 +559,26 @@ function downloadUmapChart() {
   const datasetPart = sanitizeFilenamePart(props.datasetId);
   const embeddingPart = sanitizeFilenamePart(selectedEmbedding.value);
   const colorPart = sanitizeFilenamePart(selectedColorBy.value);
-  return triggerChartDownload(umapChartRef.value, `${datasetPart}_${embeddingPart}_${colorPart}.png`);
+  return triggerChartPdfDownload(
+    umapChartRef.value,
+    `${datasetPart}_${embeddingPart}_${colorPart}.pdf`
+  );
+}
+
+function downloadUmapChart(format: "png" | "svg" = "png") {
+  if (!canDownloadUmap.value) {
+    showDownloadUnavailableMessage();
+    return false;
+  }
+
+  const datasetPart = sanitizeFilenamePart(props.datasetId);
+  const embeddingPart = sanitizeFilenamePart(selectedEmbedding.value);
+  const colorPart = sanitizeFilenamePart(selectedColorBy.value);
+  return triggerChartDownload(
+    umapChartRef.value,
+    `${datasetPart}_${embeddingPart}_${colorPart}.${format}`,
+    { type: format }
+  );
 }
 
 function openDownloadDialog(kind: LandscapeDownloadKind) {
@@ -502,8 +618,20 @@ async function runLandscapeDownload(
 
 function downloadDialogImage() {
   return downloadDialogKind.value === "composition"
-    ? downloadCompositionChart()
-    : downloadUmapChart();
+    ? downloadCompositionChart("png")
+    : downloadUmapChart("png");
+}
+
+function downloadDialogPdf() {
+  return downloadDialogKind.value === "composition"
+    ? downloadCompositionPdf()
+    : downloadUmapPdf();
+}
+
+function downloadDialogSvg() {
+  return downloadDialogKind.value === "composition"
+    ? downloadCompositionChart("svg")
+    : downloadUmapChart("svg");
 }
 
 function downloadDialogTable() {

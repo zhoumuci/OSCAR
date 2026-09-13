@@ -11,25 +11,28 @@
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L2 4.5v4.5c0 3.73 2.88 7.22 7 7.88 4.12-.66 7-4.15 7-7.88V4.5L9 1z" stroke="var(--brand-primary-3)" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 9l2 2 4-4" stroke="var(--brand-primary-3)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span>{{ allRows.length }} samples available for download</span>
           </div>
-          <a
-            href="/OSCAR/static/combined.tar.gz"
-            download
-            class="ref-dl-btn"
-            :class="{ 'is-downloading': referenceDownloadStarting }"
-            @click="acknowledgeReferenceDownload"
-          >
-            <span v-if="referenceDownloadStarting" class="download-spinner"></span>
-            {{ referenceDownloadStarting ? "STARTING…" : "Epi(genetic) Annotation" }}
-          </a>
+          <button type="button" class="ref-dl-btn" @click="additionalResourcesOpen = true">
+            Additional Resources
+          </button>
         </div>
 
         <!-- 搜索区（统一风格） -->
         <div class="search-row">
           <div class="search-label">Search:</div>
 
-          <el-select v-model="field" placeholder="Select field" class="sel" clearable>
-            <el-option v-for="f in fields" :key="f.value" :label="f.label" :value="f.value" />
-          </el-select>
+          <el-tooltip placement="top" effect="light" :show-after="200">
+            <template #content>
+              <div class="cart-help-copy">
+                Choose a field to search only that field. If no field is selected, the keyword is matched across Sample ID, biosample type, sample name, tissue, disease, platform, source ID, and sample source.
+              </div>
+            </template>
+            <span class="select-field-help-wrap">
+              <el-select v-model="field" placeholder="Select field" class="sel" clearable>
+                <el-option v-for="f in fields" :key="f.value" :label="f.label" :value="f.value" />
+              </el-select>
+              <span class="cart-btn-help-icon select-field-help-icon" role="button" tabindex="0" aria-label="Search field help">?</span>
+            </span>
+          </el-tooltip>
 
           <el-input
             v-model="keyword"
@@ -40,10 +43,22 @@
 
           <el-button type="primary" :loading="state==='loading'" @click="onSearch">Search</el-button>
 
-          <el-button class="cart-btn" :disabled="selected.length===0" @click="openCart">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 2h1.5l1.2 6.5a1 1 0 00.98.8h5.6a1 1 0 00.98-.8L13 4.7H4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="13" r="1" fill="currentColor"/><circle cx="11" cy="13" r="1" fill="currentColor"/></svg>
-              Download cart{{ selected.length > 0 ? ` (${selected.length}/10)` : '' }}
-            </el-button>
+          <el-tooltip placement="top" effect="light" :show-after="200">
+            <template #content>
+              <div class="cart-help-copy">
+                {{ selected.length === 0
+                  ? "Select one or more samples from the table first, then use Download cart to download the same file type for all selected samples."
+                  : `Download files for the ${selected.length} selected sample${selected.length === 1 ? "" : "s"}. You can select up to 10 samples.` }}
+              </div>
+            </template>
+            <span class="cart-btn-help-wrap">
+              <el-button class="cart-btn" :disabled="selected.length===0" @click="openCart">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 2h1.5l1.2 6.5a1 1 0 00.98.8h5.6a1 1 0 00.98-.8L13 4.7H4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="13" r="1" fill="currentColor"/><circle cx="11" cy="13" r="1" fill="currentColor"/></svg>
+                Download cart{{ selected.length > 0 ? ` (${selected.length}/10)` : '' }}
+              </el-button>
+              <span class="cart-btn-help-icon" role="button" tabindex="0" aria-label="Download cart help">?</span>
+            </span>
+          </el-tooltip>
         </div>
 
         <!-- 表格区：状态机 -->
@@ -124,6 +139,49 @@
           />
         </div>
       </div>
+
+      <!-- Additional resources dialog -->
+      <el-dialog
+        v-model="additionalResourcesOpen"
+        width="720px"
+        title="Additional Resources"
+        custom-class="bubble-dialog"
+        modal-class="bubble-overlay"
+        :append-to-body="true"
+        class="float-card"
+      >
+        <div class="dlg-body">
+          <div class="dlg-meta additional-resource-meta">
+            Reference annotations and tissue/cell type-specific marker Peak-to-Gene links
+          </div>
+          <div class="chip-grid additional-resource-grid">
+            <a
+              v-for="resource in additionalResources"
+              :key="resource.id"
+              :href="resource.url"
+              download
+              class="chip additional-resource-chip"
+              :class="[
+                resource.toneClass,
+                { 'is-downloading': additionalResourceStarting === resource.id },
+              ]"
+              @click="acknowledgeAdditionalResource(resource.id)"
+            >
+              <span class="chip-left">
+                <span class="chip-name">{{ resource.title }}</span>
+                <span class="chip-format">{{ resource.format }}</span>
+              </span>
+              <span class="chip-action">
+                <span v-if="additionalResourceStarting === resource.id" class="download-spinner"></span>
+                {{ additionalResourceStarting === resource.id ? "Starting…" : "Download" }}
+              </span>
+            </a>
+          </div>
+        </div>
+        <template #footer>
+          <el-button @click="additionalResourcesOpen = false">Close</el-button>
+        </template>
+      </el-dialog>
 
       <!-- Cart dialog -->
       <el-dialog
@@ -377,7 +435,31 @@ function onSearch() {
   page.value = 1;
 }
 
-const referenceDownloadStarting = ref(false);
+const additionalResourcesOpen = ref(false);
+const additionalResourceStarting = ref("");
+const additionalResources = [
+  {
+    id: "epi-genetic-annotation",
+    title: "Epi(genetic) Annotation",
+    format: "TAR.GZ",
+    url: "/OSCAR/static/combined.tar.gz",
+    toneClass: "additional-resource-chip--epi",
+  },
+  {
+    id: "marker-p2g-gene-score",
+    title: "Tissue/cell type-specific marker Peak-to-Gene links · Gene score",
+    format: "TSV",
+    url: "/OSCAR/static/merged_relations_by_tissue_gene_score.tsv",
+    toneClass: "additional-resource-chip--score",
+  },
+  {
+    id: "marker-p2g-gene-expression",
+    title: "Tissue/cell type-specific marker Peak-to-Gene links · Gene expression",
+    format: "TSV",
+    url: "/OSCAR/static/merged_relations_by_tissue_gene_expression.tsv",
+    toneClass: "additional-resource-chip--expression",
+  },
+] as const;
 const singleDownloadId = ref("");
 const cartDownloadActive = ref(false);
 const cartDownloadCurrent = ref(0);
@@ -394,9 +476,13 @@ function cartFileKey(domain: string, type: string, format: string) {
   return `${domain}:${type}:${format}`;
 }
 
-function acknowledgeReferenceDownload() {
-  referenceDownloadStarting.value = true;
-  window.setTimeout(() => { referenceDownloadStarting.value = false; }, 1600);
+function acknowledgeAdditionalResource(resourceId: string) {
+  additionalResourceStarting.value = resourceId;
+  window.setTimeout(() => {
+    if (additionalResourceStarting.value === resourceId) {
+      additionalResourceStarting.value = "";
+    }
+  }, 1600);
 }
 
 function filenameFromResponse(response: Response, fallback: string) {
@@ -615,6 +701,69 @@ function openDownloads(row: DownloadRow) {
   opacity: 0.82;
 }
 
+.additional-resource-meta {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.chip-grid.additional-resource-grid {
+  grid-template-columns: 1fr;
+}
+
+.additional-resource-chip {
+  min-height: 78px;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border-left-width: 4px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.additional-resource-chip .chip-name {
+  max-width: none;
+  white-space: normal;
+  text-align: left;
+}
+
+.additional-resource-chip--epi {
+  border-color: rgba(95, 125, 112, 0.32);
+  background: linear-gradient(135deg, rgba(247, 251, 249, 0.98), #fff);
+}
+
+.additional-resource-chip--score {
+  border-color: rgba(91, 132, 166, 0.38);
+  background: linear-gradient(135deg, rgba(241, 248, 253, 0.98), #fff);
+}
+
+.additional-resource-chip--score .chip-format {
+  border-color: rgba(91, 132, 166, 0.28);
+  background: rgba(91, 132, 166, 0.10);
+  color: #486f8f;
+}
+
+.additional-resource-chip--score .chip-action {
+  background: #6f96b5 !important;
+  box-shadow: 0 4px 10px rgba(91, 132, 166, 0.24);
+}
+
+.additional-resource-chip--expression {
+  border-color: rgba(186, 126, 82, 0.38);
+  background: linear-gradient(135deg, rgba(255, 247, 240, 0.98), #fff);
+}
+
+.additional-resource-chip--expression .chip-format {
+  border-color: rgba(186, 126, 82, 0.28);
+  background: rgba(186, 126, 82, 0.10);
+  color: #9a633b;
+}
+
+.additional-resource-chip--expression .chip-action {
+  background: #bd845c !important;
+  box-shadow: 0 4px 10px rgba(186, 126, 82, 0.24);
+}
+
 .cart-btn {
   --el-button-bg-color: rgba(143, 165, 156, 0.12);
   --el-button-border-color: rgba(143, 165, 156, 0.30);
@@ -624,9 +773,44 @@ function openDownloads(row: DownloadRow) {
   --el-button-hover-text-color: #2d4a3e;
   gap: 6px;
   font-weight: 700;
-  justify-self: end;
 }
 .cart-btn svg { flex-shrink: 0; }
+
+.cart-btn-help-wrap {
+  position: relative;
+  display: inline-flex;
+  justify-self: end;
+}
+
+.cart-btn-help-icon {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border-brand);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--brand-primary-3);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: help;
+  z-index: 1;
+}
+
+.cart-btn-help-icon:focus-visible {
+  outline: 2px solid rgba(78, 133, 118, 0.3);
+  outline-offset: 2px;
+}
+
+.cart-help-copy {
+  max-width: 340px;
+  line-height: 1.55;
+}
 
 .dl-file-btn {
   --el-button-bg-color: rgba(143, 165, 156, 0.12);
@@ -671,6 +855,17 @@ function openDownloads(row: DownloadRow) {
 
 .sel {
   width: 100%;
+}
+
+.select-field-help-wrap {
+  position: relative;
+  display: inline-flex;
+  width: 100%;
+}
+
+.select-field-help-icon {
+  top: -7px;
+  right: -7px;
 }
 
 .btn {

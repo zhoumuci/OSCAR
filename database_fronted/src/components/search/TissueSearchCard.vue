@@ -7,6 +7,7 @@
       <div class="cte-card gsc-main-card">
         <span class="cte-field-label">Tissue query</span>
         <div class="gsc-tissue-picker">
+          <HelpTooltip text="Select one tissue to find every OSCAR sample annotated with that tissue. Start typing in the selector to filter the available tissue names." label="Tissue query help" corner />
           <span class="gsc-tissue-picker-icon" aria-hidden="true">
             <span></span><span></span><span></span>
           </span>
@@ -37,12 +38,12 @@
           <span class="cte-hint">Choose one tissue type. Start typing to filter the available options.</span>
         </div>
         <div class="gsc-filter-row">
-          <label class="cte-field"><span class="cte-field-label">Per page</span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Per page</span><HelpTooltip text="Controls how many matched samples are shown on each page. It does not limit the search or CSV download." label="Tissue results per page help" /></span>
             <el-select v-model="resultSize" class="cte-select" popper-class="oscar-select-popper" :disabled="loading">
               <el-option label="10" :value="10" /><el-option label="20" :value="20" /><el-option label="50" :value="50" />
             </el-select>
           </label>
-          <label class="cte-field"><span class="cte-field-label">Sort by</span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Sort by</span><HelpTooltip text="Chooses the initial result order: OSCAR Dataset ID or total sample cell count." label="Tissue sort help" /></span>
             <el-select v-model="sortBy" class="cte-select" popper-class="oscar-select-popper" :disabled="loading" @change="onSortByChange">
               <el-option label="Dataset ID" value="sampleId" />
               <el-option label="Cell Counts" value="cellCount" />
@@ -72,12 +73,12 @@
           <button
             type="button"
             class="chart-dl-btn"
-            title="Download chart as PNG"
-            @click.stop="downloadChartPng"
+            title="Download chart image"
+            @click.stop="chartDownloadDialogOpen = true"
           >
             <el-icon><Download /></el-icon>
           </button>
-          <div class="cte-card-title">TOP 12 Tissues</div>
+          <div class="cte-card-title search-title-with-help"><span>TOP 12 Tissues</span><HelpTooltip text="The 12 tissues containing the largest numbers of OSCAR samples. Select a donut segment to run that tissue search immediately." label="Top tissues chart help" /></div>
           <div ref="donutEl" class="gsc-donut"></div>
           <p class="gsc-donut-hint">Click a tissue to search it instantly.</p>
         </div>
@@ -88,16 +89,26 @@
 
     <div v-if="hasResults" class="gsc-results">
       <div class="gsc-summary-row">
-        <div class="gsc-summary-card"><span class="gsc-sum-num">{{ results.matchedSamples }}</span><span class="gsc-sum-label">Matched samples</span></div>
+        <div class="gsc-summary-card"><HelpTooltip text="Number of distinct OSCAR samples annotated with the selected tissue." label="Matched samples help" corner /><span class="gsc-sum-num">{{ results.matchedSamples }}</span><span class="gsc-sum-label">Matched samples</span></div>
       </div>
       <div class="gsc-res-head">
-        <span class="gsc-res-title">Associated samples</span>
+        <span class="gsc-res-title search-title-with-help"><span>Associated samples</span><HelpTooltip text="One row per OSCAR sample annotated with the selected tissue. Pagination changes only the displayed rows." label="Tissue results help" /></span>
         <button type="button" class="gsc-dl-btn" title="Download all results as CSV" @click="downloadTableCsv">
           <el-icon><Download /></el-icon>
+          <span>Download</span>
         </button>
       </div>
       <div class="cte-table-wrap">
-        <table class="cte-table"><thead><tr><th class="gsc-sort-th" @click="toggleSort('sampleId')">Dataset ID <span class="gsc-sort-arrow">{{ sortArrow('sampleId') }}</span></th><th>Tissue</th><th>Sample name</th><th class="gsc-sort-th" @click="toggleSort('cellCount')">Cells <span class="gsc-sort-arrow">{{ sortArrow('cellCount') }}</span></th><th>Platform</th><th>Source ID</th><th>Disease</th><th>Sample source</th></tr></thead><tbody>
+        <table class="cte-table"><thead><tr>
+          <th class="gsc-sort-th" @click="toggleSort('sampleId')"><span class="search-table-header"><span>Dataset ID</span><HelpTooltip text="Unique OSCAR identifier for the matched sample. Select it to open Sample Details." label="Dataset ID column help" /><span class="gsc-sort-arrow">{{ sortArrow('sampleId') }}</span></span></th>
+          <th><span class="search-table-header"><span>Tissue</span><HelpTooltip text="Tissue annotation assigned to the sample." label="Tissue column help" /></span></th>
+          <th><span class="search-table-header"><span>Sample name</span><HelpTooltip text="Descriptive name of the biological sample in its source dataset." label="Sample name column help" /></span></th>
+          <th class="gsc-sort-th" @click="toggleSort('cellCount')"><span class="search-table-header"><span>Cells</span><HelpTooltip text="Total number of cells reported for the sample." label="Cells column help" /><span class="gsc-sort-arrow">{{ sortArrow('cellCount') }}</span></span></th>
+          <th><span class="search-table-header"><span>Platform</span><HelpTooltip text="Experimental platform or assay technology used to generate the sample data." label="Platform column help" /></span></th>
+          <th><span class="search-table-header"><span>Source ID</span><HelpTooltip text="Identifier or accession assigned by the original data source." label="Source ID column help" /></span></th>
+          <th><span class="search-table-header"><span>Disease</span><HelpTooltip text="Disease status recorded for the sample, such as Control or Disease." label="Disease column help" /></span></th>
+          <th><span class="search-table-header"><span>Sample source</span><HelpTooltip text="Reported anatomical or biological source of the sample." label="Sample source column help" /></span></th>
+        </tr></thead><tbody>
           <tr v-if="!rows.length"><td colspan="8" class="gsc-empty">No samples found.</td></tr>
           <tr v-for="r in paginatedRows" :key="r.sampleId">
             <td><a @click.stop="router.push({name:'SampleDetail',params:{id:r.sampleId},query:{domain:'integration',source:'search'}})" class="gsc-link"><code>{{ r.sampleId }}</code></a></td>
@@ -116,6 +127,15 @@
         </div>
       </div>
     </div>
+
+    <ChartImageDownloadDialog
+      v-model="chartDownloadDialogOpen"
+      title="Download tissue distribution"
+      chart-label="TOP 12 Tissues"
+      :download="downloadDonutChart"
+      :include-pdf="true"
+      :download-pdf="downloadDonutPdf"
+    />
   </div>
 </template>
 
@@ -128,7 +148,9 @@ import { buildApiUrl } from "@/config/api";
 import { ElMessage } from "element-plus";
 import { Download } from "@element-plus/icons-vue";
 import { downloadCsv } from "@/utils/downloadCsv";
-import { downloadChart } from "@/utils/downloadChart";
+import { downloadChart, downloadChartPdf } from "@/utils/downloadChart";
+import ChartImageDownloadDialog from "@/components/ChartImageDownloadDialog.vue";
+import HelpTooltip from "@/components/analysis/AnalysisHelpTooltip.vue";
 
 const router = useRouter();
 const props = defineProps<{ active?: boolean }>();
@@ -138,6 +160,7 @@ const sortColumn = ref<string | null>(null);
 const sortDirection = ref<"asc" | "desc">("desc");
 const tissueOptions = ref<Array<{ name: string; count: number }>>([]);
 const tissueOptionsLoading = ref(false);
+const chartDownloadDialogOpen = ref(false);
 
 function toggleSort(col: string) {
   if (sortColumn.value === col) {
@@ -270,9 +293,19 @@ function downloadTableCsv() {
   downloadCsv("oscar_tissue_search.csv", headers, data);
 }
 
-function downloadChartPng() {
-  if (!donutChart) return;
-  downloadChart(donutChart, "oscar_tissue_distribution.png");
+function downloadDonutChart(format: "png" | "svg") {
+  return downloadChart(
+    donutChart,
+    `oscar_tissue_distribution.${format}`,
+    { type: format }
+  );
+}
+
+function downloadDonutPdf() {
+  return downloadChartPdf(
+    donutChart,
+    "oscar_tissue_distribution.pdf"
+  );
 }
 </script>
 
@@ -298,14 +331,20 @@ function downloadChartPng() {
 .gsc-empty { padding: 32px; text-align: center; color: var(--muted); font-size: 14px; }
 .gsc-results { display: flex; flex-direction: column; gap: 12px; }
 .gsc-summary-row { display: flex; gap: 10px; }
-.gsc-summary-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-card); }
+.gsc-summary-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-card); }
 .gsc-sum-num { font-size: 22px; font-weight: 900; color: var(--text); }
 .gsc-sum-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
 .gsc-res-head { display: flex; align-items: center; justify-content: space-between; }
 .gsc-res-title { font-weight: 900; font-size: 14px; }
-.gsc-dl-btn { appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border-brand); border-radius: 999px; background: #fffffff2; color: var(--brand-primary-3); box-shadow: inset 0 1px 0 #ffffffcc, 0 6px 14px #12182614; cursor: pointer; transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, transform 0.18s ease; }
+.gsc-dl-btn { appearance: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 104px; height: 34px; padding: 0 12px; border: 1px solid var(--border-brand); border-radius: 10px; background: #fffffff2; color: var(--brand-primary-3); font-weight: 850; box-shadow: inset 0 1px 0 #ffffffcc, 0 6px 14px #12182614; cursor: pointer; transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, transform 0.18s ease; }
 .gsc-dl-btn:hover { border-color: var(--nav-active-border); background: var(--surface-2); color: var(--text); box-shadow: inset 0 1px 0 #ffffffcc, 0 8px 16px rgba(95,125,112,0.16); transform: translateY(-1px); }
 .gsc-dl-btn :deep(.el-icon) { font-size: 15px; }
+.cte-field-label-row,
+.search-title-with-help,
+.search-table-header { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.cte-card-title.search-title-with-help { justify-content: flex-start; }
+.cte-field-label-row { width: fit-content; }
+.search-action-with-help { position: relative; display: inline-flex; align-items: stretch; }
 .cte-field { display: flex; flex-direction: column; gap: 5px; }
 .cte-field-label { font-size: 14px; font-weight: 900; color: rgba(39,66,58,0.84); }
 .cte-hint { font-size: 12px; font-weight: 600; color: var(--muted); }
@@ -341,7 +380,7 @@ function downloadChartPng() {
 .cte-table code { font-size: 13px; color: var(--brand-primary-3); font-weight: 700; }
 .gsc-sort-th { cursor: pointer; user-select: none; }
 .gsc-sort-th:hover { color: var(--brand-primary-3); }
-.gsc-sort-arrow { font-size: 10px; margin-left: 2px; }
+.gsc-sort-arrow { flex: 0 0 auto; font-size: 10px; margin-left: 5px; }
 .gsc-link { color: var(--brand-primary-3); font-weight: 700; cursor: pointer; text-decoration: none; }
 .gsc-link:hover { text-decoration: underline; }
 .cte-pagination { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-top: 1px solid var(--border); }
@@ -376,6 +415,7 @@ function downloadChartPng() {
   .gsc-filter-row .cte-field { min-width: 0; }
   .gsc-hint-row { align-items: flex-start; flex-direction: column; gap: 6px; }
   .gsc-btn-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .search-action-with-help > button { width: 100%; }
   .primary-btn,
   .soft-btn,
   .cte-textarea,

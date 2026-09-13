@@ -176,7 +176,7 @@
           <el-input
             v-model="minLog2fc"
             class="control-input"
-            placeholder="0.25"
+            :placeholder="activeAnnotationType === 'marker_peak' ? DEFAULT_MARKER_PEAK_MIN_LOG2FC : '0.25'"
             clearable
             inputmode="decimal"
             size="small"
@@ -189,7 +189,7 @@
           <el-input
             v-model="minP2gScore"
             class="control-input"
-            placeholder="0.25"
+            placeholder="0.8"
             clearable
             inputmode="decimal"
             size="small"
@@ -246,6 +246,14 @@
                       <span class="signal-dot signal-dot--score" /> Gene activity score marker
                     </div>
                     <div>Shows which marker-gene measurement supplied the gene values in this row.</div>
+                  </div>
+                  <div v-else-if="column.kind === 'abc-support'">
+                    <div class="abc-support-legend">
+                      <span class="abc-support-dot abc-support-dot--supported" /> ABC supported
+                      &nbsp;&nbsp;
+                      <span class="abc-support-dot abc-support-dot--unsupported" /> Evaluated but unsupported
+                    </div>
+                    <div>Shows whether this stored peak-to-gene link is supported by the Activity-by-Contact model.</div>
                   </div>
                   <div v-else><div v-for="line in column.headerTooltip" :key="line">{{ line }}</div></div>
                 </template>
@@ -386,6 +394,20 @@
               <span v-else class="signal-type-label">-</span>
             </span>
 
+            <span v-else-if="column.kind === 'abc-support'" class="abc-support-cell">
+              <span
+                v-if="row.abcSupport === 1"
+                class="abc-support-dot abc-support-dot--supported"
+                title="ABC supported"
+              />
+              <span
+                v-else-if="row.abcSupport === 0"
+                class="abc-support-dot abc-support-dot--unsupported"
+                title="Evaluated but not ABC supported"
+              />
+              <span v-else class="abc-support-label">-</span>
+            </span>
+
             <span v-else-if="column.kind === 'link-score'" class="metric-badge metric-badge--strong">
               {{ linkScoreDisplay(row) }}
             </span>
@@ -482,6 +504,7 @@ type ColumnKind =
   | "gene-evidence"
   | "peak-evidence"
   | "signal-type"
+  | "abc-support"
   | "link-score"
   | "tf"
   | "source";
@@ -582,12 +605,16 @@ const COLUMN_TOOLTIPS = {
   p2gScore: ["Strength assigned to this peak-to-gene link by the source P2G method.", "It describes the stored link and is not recalculated separately for each cell type."],
   p2gGeneEvidence: ["Marker-gene values for the gene end of this P2G link, including Log2FC and FDR when available.", "Their presence confirms that the linked gene is a marker in the matching sample and cell type or cluster."],
   p2gPeakEvidence: ["Marker-peak values for the peak end of this P2G link, including Log2FC and FDR when available.", "Their presence confirms that the linked peak is a marker in the same sample and cell type or cluster."],
+  p2gAbcSupport: ["Whether this stored peak-to-gene link is supported by the Activity-by-Contact model.", "Blue means ABC supported; gray means evaluated but unsupported. A dash means the link was not evaluated."],
   p2gSample: ["OSCAR dataset identifier, sample name, and data type for the stored P2G link.", "Use the sample link to open the complete sample details."],
   tf: ["Reserved for a future transcription-factor annotation.", "A blank value means this information is not available in the current data."],
 } as const;
 
 const pageSizeOptions = [10, 20, 50];
 const DEFAULT_ANNOTATION_TYPE: RegulatoryAnnotationType = "marker_gene";
+const DEFAULT_MIN_P2G_SCORE = "0.8";
+const DEFAULT_MARKER_PEAK_MAX_FDR = "0.05";
+const DEFAULT_MARKER_PEAK_MIN_LOG2FC = "0.5";
 
 const activeAnnotationType = ref<RegulatoryAnnotationType>(DEFAULT_ANNOTATION_TYPE);
 
@@ -659,7 +686,7 @@ const markerPeakSearchMode = ref<MarkerPeakSearchMode>("gene");
 const context = ref("");
 const maxFdr = ref("");
 const minLog2fc = ref("");
-const minP2gScore = ref("0.25");
+const minP2gScore = ref(DEFAULT_MIN_P2G_SCORE);
 const p2gMode = ref<"marker" | "all">("marker");
 const page = ref(1);
 const pageSize = ref(10);
@@ -980,6 +1007,14 @@ function getActiveColumns(annotationType: RegulatoryAnnotationType): AnnotationC
           headerTooltip: ["Corrected variance value for the ATAC part of the P2G calculation.", "A smaller value indicates stronger support from accessibility variation."],
         },
         {
+          key: "abcSupport",
+          label: "ABC support",
+          kind: "abc-support",
+          minWidth: 125,
+          align: "center",
+          headerTooltip: COLUMN_TOOLTIPS.p2gAbcSupport,
+        },
+        {
           key: "source",
           label: "Sample",
           kind: "source",
@@ -1035,6 +1070,14 @@ function getActiveColumns(annotationType: RegulatoryAnnotationType): AnnotationC
         minWidth: 120,
         align: "center",
         headerTooltip: ["Shows which marker-gene measurement supplied the gene values in this row.", "Gene expression uses RNA values; gene activity score uses ATAC-derived gene activity values."],
+      },
+      {
+        key: "abcSupport",
+        label: "ABC support",
+        kind: "abc-support",
+        minWidth: 125,
+        align: "center",
+        headerTooltip: COLUMN_TOOLTIPS.p2gAbcSupport,
       },
       {
         key: "source",
@@ -1125,9 +1168,9 @@ function resetAnnotationTabState() {
   p2gSearchMode.value = "gene";
   markerPeakSearchMode.value = "gene";
   context.value = "";
-  maxFdr.value = "";
-  minLog2fc.value = "";
-  minP2gScore.value = "0.25";
+  maxFdr.value = activeAnnotationType.value === "marker_peak" ? DEFAULT_MARKER_PEAK_MAX_FDR : "";
+  minLog2fc.value = activeAnnotationType.value === "marker_peak" ? DEFAULT_MARKER_PEAK_MIN_LOG2FC : "";
+  minP2gScore.value = DEFAULT_MIN_P2G_SCORE;
   page.value = 1;
   pageSize.value = 10;
   sortBy.value = "";
@@ -1813,9 +1856,9 @@ function resetAnnotations() {
   targetGeneQuery.value = "";
   peakQuery.value = "";
   context.value = "";
-  maxFdr.value = "";
-  minLog2fc.value = "";
-  minP2gScore.value = "0.25";
+  maxFdr.value = activeAnnotationType.value === "marker_peak" ? DEFAULT_MARKER_PEAK_MAX_FDR : "";
+  minLog2fc.value = activeAnnotationType.value === "marker_peak" ? DEFAULT_MARKER_PEAK_MIN_LOG2FC : "";
+  minP2gScore.value = DEFAULT_MIN_P2G_SCORE;
   sortBy.value = "";
   sortOrder.value = "";
   page.value = 1;
@@ -1935,6 +1978,8 @@ watch(() => props.domain, (newDomain) => {
   if (firstTab && !tabs.some(t => t.value === activeAnnotationType.value)) {
     activeAnnotationType.value = firstTab.value;
   }
+  maxFdr.value = activeAnnotationType.value === "marker_peak" ? DEFAULT_MARKER_PEAK_MAX_FDR : "";
+  minLog2fc.value = activeAnnotationType.value === "marker_peak" ? DEFAULT_MARKER_PEAK_MIN_LOG2FC : "";
   page.value = 1;
   sortBy.value = "";
   sortOrder.value = "";
@@ -1944,6 +1989,8 @@ watch(() => props.domain, (newDomain) => {
 watch(() => props.datasetId, () => {
   annotationTabStates.clear();
   activeAnnotationType.value = DEFAULT_ANNOTATION_TYPE;
+  maxFdr.value = "";
+  minLog2fc.value = "";
   page.value = 1;
   sortBy.value = "";
   sortOrder.value = "";
@@ -2770,6 +2817,46 @@ watch(downloading, (isDownloading, wasDownloading) => {
 }
 
 .signal-type-label {
+  color: var(--muted);
+}
+
+.abc-support-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.abc-support-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.abc-support-dot--supported {
+  background-color: #3b82f6;
+}
+
+.abc-support-dot--unsupported {
+  background-color: #94a3b8;
+}
+
+.abc-support-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.abc-support-legend .abc-support-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.abc-support-label {
   color: var(--muted);
 }
 

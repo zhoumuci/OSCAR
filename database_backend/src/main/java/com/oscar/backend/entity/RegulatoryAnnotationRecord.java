@@ -5,6 +5,7 @@ public class RegulatoryAnnotationRecord {
     private String id;
     private String annotationType;
     private String signalType;
+    private Integer abcSupport;
     private Double varQrna;
     private Double varQatac;
     private String datasetId;
@@ -89,6 +90,14 @@ public class RegulatoryAnnotationRecord {
 
     public void setSignalType(String signalType) {
         this.signalType = signalType;
+    }
+
+    public Integer getAbcSupport() {
+        return abcSupport;
+    }
+
+    public void setAbcSupport(Integer abcSupport) {
+        this.abcSupport = abcSupport;
     }
 
     public Double getVarQrna() { return varQrna; }

@@ -102,6 +102,29 @@ export async function fetchBrowseSamples(params: BrowseSampleQuery): Promise<Bro
   return unwrapBackendResponse(data, fallback, "GET /api/browse/samples");
 }
 
+export async function fetchAllBrowseSamples(params: BrowseSampleQuery): Promise<BrowseSample[]> {
+  const pageSize = 100;
+  const records: BrowseSample[] = [];
+  let page = 1;
+  let total = 0;
+
+  do {
+    const result = await fetchBrowseSamples({
+      ...params,
+      page,
+      pageSize,
+    });
+
+    records.push(...result.records);
+    total = result.total;
+
+    if (result.records.length === 0) break;
+    page += 1;
+  } while (records.length < total);
+
+  return records;
+}
+
 export async function fetchBrowseFacets(params: BrowseFacetQuery = {}): Promise<BrowseFacetResponse> {
   const fallback: BrowseFacetResponse = {
     species: [],

@@ -63,6 +63,7 @@ public interface RegulatoryAnnotationMaintenanceMapper {
                 link_score,
                 correlation,
                 link_fdr,
+                abc_support,
 
                 has_marker_peak,
                 is_representative,
@@ -109,6 +110,7 @@ public interface RegulatoryAnnotationMaintenanceMapper {
                 pgl.link_score,
                 pgl.correlation,
                 pgl.fdr AS link_fdr,
+                pgl.abc_support,
 
                 CASE WHEN mp.id IS NOT NULL THEN 1 ELSE 0 END AS has_marker_peak,
                 CASE WHEN ROW_NUMBER() OVER (

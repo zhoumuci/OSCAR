@@ -88,6 +88,7 @@ public interface DownloadMapper {
             p.fdr         AS link_fdr,
             p.var_q_rna   AS var_q_rna,
             p.var_q_atac  AS var_q_atac,
+            p.abc_support AS abc_support,
             p.cell_type,
             NULLIF(p.cell_type, '') AS standard_cell_type
         FROM oscar_peak_gene_link p
@@ -118,7 +119,8 @@ public interface DownloadMapper {
             mlr.peak_log2fc,
             mlr.peak_fdr,
             mlr.peak_mean_diff,
-            NULLIF(TRIM(mlr.signal_type), '') AS signal_type
+            NULLIF(TRIM(mlr.signal_type), '') AS signal_type,
+            mlr.abc_support AS abc_support
         FROM oscar_marker_linked_region mlr
         WHERE mlr.dataset_id = #{datasetId}
           AND mlr.domain = #{domain}

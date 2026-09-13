@@ -21,6 +21,7 @@ public class RegulatoryAnnotationRow {
     private Double geneMeanDiff;
     private String markerGeneSourceFile;
     private String signalType;
+    private Integer abcSupport;
     private String peakName;
     private String peakRegion;
     private String peakChromosome;
@@ -193,6 +194,14 @@ public class RegulatoryAnnotationRow {
 
     public void setSignalType(String signalType) {
         this.signalType = signalType;
+    }
+
+    public Integer getAbcSupport() {
+        return abcSupport;
+    }
+
+    public void setAbcSupport(Integer abcSupport) {
+        this.abcSupport = abcSupport;
     }
 
     public String getPeakName() {

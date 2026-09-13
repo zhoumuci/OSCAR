@@ -8,7 +8,17 @@
       <div class="pgc-main">
         <div class="pgc-input-row">
           <div class="cte-card pgc-input-card">
-            <div class="cte-card-title">Peak set input <span class="cte-max-badge">MAX input: 100 regions</span></div>
+            <div class="cte-card-title">
+              <span>Peak set input
+                <span class="pgc-max-help-wrap">
+                  <span class="cte-max-badge">MAX input: 100 regions</span>
+                  <el-tooltip placement="top" effect="light" :show-after="200">
+                    <template #content><div class="pgc-tooltip-copy">{{ PGC_HELP.peakInput }}</div></template>
+                    <span class="pgc-help-icon" role="button" tabindex="0" aria-label="Peak set input help">?</span>
+                  </el-tooltip>
+                </span>
+              </span>
+            </div>
             <p class="cte-hint">Paste BED regions or chr:start-end coordinates, one region per line.</p>
             <textarea
               v-model="peakInput"
@@ -23,26 +33,48 @@
               <span class="input-feedback-card__body"><strong>Check your peak set</strong><span>{{ peakInputError }}</span></span>
             </div>
             <div class="cte-btn-row">
-              <span class="pgc-upload-wrap">
+              <span class="pgc-button-help-wrap">
                 <button type="button" class="soft-btn" :disabled="loading" @click="peakFileRef?.click()">Upload BED</button>
                 <el-tooltip placement="top" effect="light" :show-after="200">
                   <template #content><div><div>Accepted files: .bed and .txt.</div><div>Each row must contain chr:start-end or the first three BED columns: chromosome, start, and end.</div></div></template>
-                  <span class="pgc-help-icon">?</span>
+                  <span class="pgc-help-icon" role="button" tabindex="0" aria-label="Upload peak file help">?</span>
                 </el-tooltip>
               </span>
-              <button type="button" class="soft-btn" :disabled="loading" @click="loadBrainSample">Load sample</button>
-              <button type="button" class="soft-btn" :disabled="loading" @click="peakInput = ''">Clear</button>
+              <span class="pgc-button-help-wrap">
+                <button type="button" class="soft-btn" :disabled="loading" @click="loadGbmSample">Load sample</button>
+                <el-tooltip placement="top" effect="light" :show-after="200">
+                  <template #content><div class="pgc-tooltip-copy">{{ PGC_HELP.loadSample }}</div></template>
+                  <span class="pgc-help-icon" role="button" tabindex="0" aria-label="Load peak sample help">?</span>
+                </el-tooltip>
+              </span>
+              <span class="pgc-button-help-wrap">
+                <button type="button" class="soft-btn" :disabled="loading" @click="peakInput = ''">Clear</button>
+                <el-tooltip placement="top" effect="light" :show-after="200">
+                  <template #content><div class="pgc-tooltip-copy">{{ PGC_HELP.clearPeaks }}</div></template>
+                  <span class="pgc-help-icon" role="button" tabindex="0" aria-label="Clear peaks help">?</span>
+                </el-tooltip>
+              </span>
             </div>
             <div class="pgc-stat-row">
-              <div class="pgc-stat pgc-stat--muted"><span class="pgc-stat-num">{{ peakStats.input }}</span><span class="pgc-stat-label">Input peaks</span></div>
-              <div class="pgc-stat"><span class="pgc-stat-num">{{ peakStats.valid }}</span><span class="pgc-stat-label">Valid peaks</span></div>
-              <div class="pgc-stat pgc-stat--bad"><span class="pgc-stat-num">{{ peakStats.invalid }}</span><span class="pgc-stat-label">Invalid lines</span></div>
+              <div class="pgc-stat pgc-stat--muted"><span class="pgc-stat-num">{{ peakStats.input }}</span><span class="pgc-stat-label">Input peaks</span><HelpTooltip :text="PGC_HELP.inputPeaks" label="Input peaks help" corner /></div>
+              <div class="pgc-stat"><span class="pgc-stat-num">{{ peakStats.valid }}</span><span class="pgc-stat-label">Valid peaks</span><HelpTooltip :text="PGC_HELP.validPeaks" label="Valid peaks help" corner /></div>
+              <div class="pgc-stat pgc-stat--bad"><span class="pgc-stat-num">{{ peakStats.invalid }}</span><span class="pgc-stat-label">Invalid lines</span><HelpTooltip :text="PGC_HELP.invalidPeaks" label="Invalid peak lines help" corner /></div>
             </div>
             <input ref="peakFileRef" type="file" accept=".bed,.txt" class="pgc-hidden-input" @change="onPeakFileSelected" />
           </div>
 
           <div class="cte-card pgc-input-card">
-            <div class="cte-card-title">Gene set input <span class="cte-max-badge">MAX input: 100 genes</span></div>
+            <div class="cte-card-title">
+              <span>Gene set input
+                <span class="pgc-max-help-wrap">
+                  <span class="cte-max-badge">MAX input: 100 genes</span>
+                  <el-tooltip placement="top" effect="light" :show-after="200">
+                    <template #content><div class="pgc-tooltip-copy">{{ PGC_HELP.geneInput }}</div></template>
+                    <span class="pgc-help-icon" role="button" tabindex="0" aria-label="Gene set input help">?</span>
+                  </el-tooltip>
+                </span>
+              </span>
+            </div>
             <p class="cte-hint">Paste human gene symbols, one per line or separated by comma or space.</p>
             <textarea
               v-model="geneInput"
@@ -57,20 +89,32 @@
               <span class="input-feedback-card__body"><strong>Check your gene set</strong><span>{{ geneInputError }}</span></span>
             </div>
             <div class="cte-btn-row">
-              <span class="pgc-upload-wrap">
+              <span class="pgc-button-help-wrap">
                 <button type="button" class="soft-btn" :disabled="loading" @click="geneFileRef?.click()">Upload file</button>
                 <el-tooltip placement="top" effect="light" :show-after="200">
                   <template #content><div><div>Accepted files: .txt and .csv.</div><div>Gene symbols may appear one per line or in delimited cells. Duplicate symbols are removed before matching.</div></div></template>
-                  <span class="pgc-help-icon">?</span>
+                  <span class="pgc-help-icon" role="button" tabindex="0" aria-label="Upload gene file help">?</span>
                 </el-tooltip>
               </span>
-              <button type="button" class="soft-btn" :disabled="loading" @click="loadBrainSample">Load sample</button>
-              <button type="button" class="soft-btn" :disabled="loading" @click="geneInput = ''">Clear</button>
+              <span class="pgc-button-help-wrap">
+                <button type="button" class="soft-btn" :disabled="loading" @click="loadGbmSample">Load sample</button>
+                <el-tooltip placement="top" effect="light" :show-after="200">
+                  <template #content><div class="pgc-tooltip-copy">{{ PGC_HELP.loadSample }}</div></template>
+                  <span class="pgc-help-icon" role="button" tabindex="0" aria-label="Load gene sample help">?</span>
+                </el-tooltip>
+              </span>
+              <span class="pgc-button-help-wrap">
+                <button type="button" class="soft-btn" :disabled="loading" @click="geneInput = ''">Clear</button>
+                <el-tooltip placement="top" effect="light" :show-after="200">
+                  <template #content><div class="pgc-tooltip-copy">{{ PGC_HELP.clearGenes }}</div></template>
+                  <span class="pgc-help-icon" role="button" tabindex="0" aria-label="Clear genes help">?</span>
+                </el-tooltip>
+              </span>
             </div>
             <div class="pgc-stat-row">
-              <div class="pgc-stat pgc-stat--muted"><span class="pgc-stat-num">{{ geneStats.input }}</span><span class="pgc-stat-label">Input genes</span></div>
-              <div class="pgc-stat"><span class="pgc-stat-num">{{ geneStats.valid }}</span><span class="pgc-stat-label">Valid genes</span></div>
-              <div class="pgc-stat pgc-stat--bad"><span class="pgc-stat-num">{{ geneStats.invalid }}</span><span class="pgc-stat-label">Invalid tokens</span></div>
+              <div class="pgc-stat pgc-stat--muted"><span class="pgc-stat-num">{{ geneStats.input }}</span><span class="pgc-stat-label">Input genes</span><HelpTooltip :text="PGC_HELP.inputGenes" label="Input genes help" corner /></div>
+              <div class="pgc-stat"><span class="pgc-stat-num">{{ geneStats.valid }}</span><span class="pgc-stat-label">Valid genes</span><HelpTooltip :text="PGC_HELP.validGenes" label="Valid genes help" corner /></div>
+              <div class="pgc-stat pgc-stat--bad"><span class="pgc-stat-num">{{ geneStats.invalid }}</span><span class="pgc-stat-label">Invalid tokens</span><HelpTooltip :text="PGC_HELP.invalidGenes" label="Invalid gene tokens help" corner /></div>
             </div>
             <input ref="geneFileRef" type="file" accept=".txt,.csv" class="pgc-hidden-input" @change="onGeneFileSelected" />
           </div>
@@ -86,7 +130,10 @@
 
           <div class="cte-fields cte-fields--grid">
             <label class="cte-field">
-              <span class="cte-field-label">Tissue <em>required</em></span>
+              <span class="cte-field-label pgc-label-with-help">
+                <span>Tissue <em>required</em></span>
+                <HelpTooltip :text="PGC_HELP.tissue" label="Tissue help" />
+              </span>
               <el-select
                 v-model="tissue"
                 class="cte-select"
@@ -102,7 +149,10 @@
             </label>
 
             <label class="cte-field">
-              <span class="cte-field-label">Dataset <small>optional</small></span>
+              <span class="cte-field-label pgc-label-with-help">
+                <span>Dataset <small>optional</small></span>
+                <HelpTooltip :text="PGC_HELP.dataset" label="Dataset help" />
+              </span>
               <el-select
                 v-model="datasetId"
                 class="cte-select"
@@ -129,11 +179,12 @@
                 <el-tooltip placement="top" effect="light" :show-after="200">
                   <template #content>
                     <div class="pgc-tooltip-copy">
-                      <div><strong>Peak-to-Gene links only:</strong> searches the original P2G table using the submitted genes, selected tissue or dataset, and overlapping submitted peak regions.</div>
-                      <div><strong>Peak-to-Gene links + marker:</strong> applies the same P2G search, then keeps only links whose peak and gene are both markers in the same sample and cell type or cluster.</div>
+                      <div>This setting decides whether ordinary P2G links are enough or marker evidence is also required.</div>
+                      <div><strong>Peak-to-Gene links only:</strong> return P2G links that match the submitted genes, tissue or dataset, and overlapping peak regions.</div>
+                      <div><strong>Peak-to-Gene links + marker:</strong> start from the same matches, then keep only links whose peak and gene are both markers in the same dataset and cell type or cluster.</div>
                     </div>
                   </template>
-                  <span class="pgc-help-icon pgc-help-icon--inline">?</span>
+                  <span class="pgc-help-icon pgc-help-icon--inline" role="button" tabindex="0" aria-label="Reference mode help">?</span>
                 </el-tooltip>
               </span>
               <el-select v-model="referenceMode" class="cte-select" popper-class="oscar-select-popper" size="small" :disabled="loading">
@@ -143,7 +194,10 @@
             </label>
 
             <label class="cte-field">
-              <span class="cte-field-label">Result type</span>
+              <span class="cte-field-label pgc-label-with-help">
+                <span>Result type</span>
+                <HelpTooltip :text="PGC_HELP.resultType" label="Result type help" />
+              </span>
               <el-select v-model="resultType" class="cte-select" popper-class="oscar-select-popper" size="small" :disabled="loading">
                 <el-option label="General" value="general" />
                 <el-option v-if="referenceMode === 'p2g_markers'" label="Cell type" value="cell_type" />
@@ -153,21 +207,39 @@
 
           <div v-show="advancedOpen" class="cte-advanced">
             <label class="cte-field">
-              <span class="cte-field-label">Minimum overlap (bp)</span>
+              <span class="cte-field-label pgc-label-with-help">
+                <span>Minimum overlap (bp)</span>
+                <HelpTooltip :text="PGC_HELP.minOverlap" label="Minimum overlap help" />
+              </span>
               <el-input-number v-model="minOverlapBp" class="cte-number" size="small" :min="1" :disabled="loading" />
             </label>
             <label class="cte-field">
-              <span class="cte-field-label">Maximum returned records</span>
+              <span class="cte-field-label pgc-label-with-help">
+                <span>Maximum returned records</span>
+                <HelpTooltip :text="PGC_HELP.maxReturned" label="Maximum returned records help" />
+              </span>
               <el-input-number v-model="maxReturnedLinks" class="cte-number" size="small" :min="1" placeholder="All" :disabled="loading" />
               <small class="cte-field-hint">Leave empty to return all matched results.</small>
             </label>
           </div>
 
           <div class="cte-card-actions">
-            <button type="button" class="primary-btn" :disabled="loading || hasBlockingInputError" @click="runAnalysis">
-              <span v-if="loading" class="btn-spinner"></span>{{ loading ? "Running…" : "Run analysis" }}
-            </button>
-            <button type="button" class="soft-btn" :disabled="loading" @click="resetAll">Reset</button>
+            <span class="pgc-button-help-wrap">
+              <button type="button" class="primary-btn" :disabled="loading || hasBlockingInputError" @click="runAnalysis">
+                <span v-if="loading" class="btn-spinner"></span>{{ loading ? "Running…" : "Run analysis" }}
+              </button>
+              <el-tooltip placement="top" effect="light" :show-after="200">
+                <template #content><div class="pgc-tooltip-copy">{{ PGC_HELP.runAnalysis }}</div></template>
+                <span class="pgc-help-icon" role="button" tabindex="0" aria-label="Run analysis help">?</span>
+              </el-tooltip>
+            </span>
+            <span class="pgc-button-help-wrap">
+              <button type="button" class="soft-btn" :disabled="loading" @click="resetAll">Reset</button>
+              <el-tooltip placement="top" effect="light" :show-after="200">
+                <template #content><div class="pgc-tooltip-copy">{{ PGC_HELP.reset }}</div></template>
+                <span class="pgc-help-icon" role="button" tabindex="0" aria-label="Reset analysis help">?</span>
+              </el-tooltip>
+            </span>
           </div>
 
           <div v-if="loading" class="pgc-progress-card" role="status" aria-live="polite">
@@ -213,15 +285,30 @@
 
     <div v-if="result" class="pgc-results">
       <div class="pgc-summary-row">
-        <div class="cte-summary-card"><span class="sum-num">{{ fmt(result.summary.totalPairs) }}</span><span class="sum-label">{{ resultTypeAtRun === 'general' ? 'P2G links' : 'Matched records' }}</span></div>
-        <div class="cte-summary-card"><span class="sum-num">{{ fmt(result.summary.uniqueDatasets) }}</span><span class="sum-label">Datasets</span></div>
-        <div class="cte-summary-card"><span class="sum-num">{{ fmt(result.summary.uniquePeaks) }}</span><span class="sum-label">Linked peaks</span></div>
-        <div class="cte-summary-card"><span class="sum-num">{{ fmt(result.summary.uniqueGenes) }}</span><span class="sum-label">Linked genes</span></div>
-        <div v-if="resultTypeAtRun === 'cell_type'" class="cte-summary-card"><span class="sum-num">{{ fmt(result.summary.uniqueCellTypes) }}</span><span class="sum-label">Cell types</span></div>
+        <div class="cte-summary-card">
+          <span class="sum-num">{{ fmt(result.summary.totalPairs) }}</span>
+          <span class="sum-label">{{ resultTypeAtRun === 'general' ? 'P2G links' : 'Matched records' }}</span><HelpTooltip :text="PGC_HELP.summaryTotal" label="Matched result count help" corner />
+        </div>
+        <div class="cte-summary-card">
+          <span class="sum-num">{{ fmt(result.summary.uniqueDatasets) }}</span>
+          <span class="sum-label">Datasets</span><HelpTooltip :text="PGC_HELP.summaryDatasets" label="Dataset count help" corner />
+        </div>
+        <div class="cte-summary-card">
+          <span class="sum-num">{{ fmt(result.summary.uniquePeaks) }}</span>
+          <span class="sum-label">Linked peaks</span><HelpTooltip :text="PGC_HELP.summaryPeaks" label="Linked peaks count help" corner />
+        </div>
+        <div class="cte-summary-card">
+          <span class="sum-num">{{ fmt(result.summary.uniqueGenes) }}</span>
+          <span class="sum-label">Linked genes</span><HelpTooltip :text="PGC_HELP.summaryGenes" label="Linked genes count help" corner />
+        </div>
+        <div v-if="resultTypeAtRun === 'cell_type'" class="cte-summary-card">
+          <span class="sum-num">{{ fmt(result.summary.uniqueCellTypes) }}</span>
+          <span class="sum-label">Cell types</span><HelpTooltip :text="PGC_HELP.summaryCellTypes" label="Cell type count help" corner />
+        </div>
       </div>
 
       <div v-if="resultTypeAtRun === 'cell_type' && result.summary.topCellType" class="pgc-result-top-cell">
-        <span class="pgc-top-label">Top cell type:</span>
+        <span class="pgc-top-label">Top cell type:</span><HelpTooltip :text="PGC_HELP.topCellType" label="Top cell type help" corner />
         <strong>{{ result.summary.topCellType }}</strong>
         <span class="pgc-top-count">{{ fmt(result.summary.topCellTypeEvidence) }} matched records</span>
       </div>
@@ -232,13 +319,19 @@
             {{ tab.label }}
             <el-tooltip v-if="tab.tipLines" placement="top" effect="light" :show-after="300">
               <template #content><div class="pgc-tooltip-copy"><div v-for="line in tab.tipLines" :key="line">{{ line }}</div></div></template>
-              <span class="pgc-tab-help">?</span>
+              <span class="pgc-tab-help" role="button" tabindex="0" :aria-label="`${tab.label} help`" @click.stop>?</span>
             </el-tooltip>
           </button>
         </div>
-        <el-tooltip :content="resTab === 'network' ? 'Download network' : resTab === 'table' ? 'Download all returned records as CSV' : 'Download displayed chart as PNG'" placement="top" effect="light">
-          <button type="button" class="annotation-download-button" @click="downloadActiveResult"><el-icon><Download /></el-icon></button>
-        </el-tooltip>
+        <span class="pgc-button-help-wrap pgc-result-download-wrap">
+          <button type="button" class="soft-btn" :disabled="!result.pairs.length" @click="downloadActiveResult">
+            <span>⇩</span> Download
+          </button>
+          <el-tooltip placement="top" effect="light" :show-after="200">
+            <template #content><div class="pgc-tooltip-copy">{{ activeResultDownloadHelp }}</div></template>
+            <span class="pgc-help-icon" role="button" tabindex="0" aria-label="Download current result help">?</span>
+          </el-tooltip>
+        </span>
       </div>
 
       <div class="pgc-res-content">
@@ -252,12 +345,12 @@
           <table class="cte-table">
             <thead>
               <tr>
-                <th>Peak</th>
-                <th class="gsc-sort-th" @click="togglePairSort('geneName')">Gene <span class="gsc-sort-arrow">{{ pairSortArrow('geneName') }}</span></th>
-                <th v-if="resultTypeAtRun === 'cell_type'" class="gsc-sort-th" @click="togglePairSort('cellType')">Cell type <span class="gsc-sort-arrow">{{ pairSortArrow('cellType') }}</span></th>
-                <th class="gsc-sort-th" @click="togglePairSort('datasetId')">Dataset <span class="gsc-sort-arrow">{{ pairSortArrow('datasetId') }}</span></th>
-                <th class="gsc-sort-th" @click="togglePairSort('linkScore')">Link score <span class="gsc-sort-arrow">{{ pairSortArrow('linkScore') }}</span></th>
-                <th class="gsc-sort-th" @click="togglePairSort('linkFdr')">Link FDR <span class="gsc-sort-arrow">{{ pairSortArrow('linkFdr') }}</span></th>
+                <th><span class="pgc-th-label"><span>Peak</span><HelpTooltip text="hg38 coordinates of the matched peak." label="Peak column help" /></span></th>
+                <th class="gsc-sort-th" @click="togglePairSort('geneName')"><span class="pgc-th-label"><span>Gene</span><HelpTooltip text="Gene linked to the matched peak." label="Gene column help" /><span class="gsc-sort-arrow">{{ pairSortArrow('geneName') }}</span></span></th>
+                <th v-if="resultTypeAtRun === 'cell_type'" class="gsc-sort-th" @click="togglePairSort('cellType')"><span class="pgc-th-label"><span>Cell type</span><HelpTooltip text="Cell type or cluster supporting this marker link." label="Cell type column help" /><span class="gsc-sort-arrow">{{ pairSortArrow('cellType') }}</span></span></th>
+                <th class="gsc-sort-th" @click="togglePairSort('datasetId')"><span class="pgc-th-label"><span>Dataset</span><HelpTooltip text="OSCAR dataset containing this result." label="Dataset column help" /><span class="gsc-sort-arrow">{{ pairSortArrow('datasetId') }}</span></span></th>
+                <th class="gsc-sort-th" @click="togglePairSort('linkScore')"><span class="pgc-th-label"><span>Link score</span><HelpTooltip text="Strength score reported for this peak-to-gene link." label="Link score column help" /><span class="gsc-sort-arrow">{{ pairSortArrow('linkScore') }}</span></span></th>
+                <th class="gsc-sort-th" @click="togglePairSort('linkFdr')"><span class="pgc-th-label"><span>Link FDR</span><HelpTooltip text="Multiple-testing adjusted significance of this peak-to-gene link." label="Link FDR column help" /><span class="gsc-sort-arrow">{{ pairSortArrow('linkFdr') }}</span></span></th>
               </tr>
             </thead>
             <tbody>
@@ -339,6 +432,38 @@
           <button
             type="button"
             class="landscape-download-chip"
+            :class="{ 'landscape-download-chip--loading': activeNetworkDownloadAction === 'pdf' }"
+            :disabled="activeNetworkDownloadAction !== null"
+            @click="runNetworkDownload('pdf', downloadNetworkPdf)"
+          >
+            <span class="landscape-download-chip-left">
+              <span class="landscape-download-chip-name">Current network image</span>
+              <span class="landscape-download-chip-format">PDF · Document · Current view</span>
+            </span>
+            <span class="landscape-download-chip-action" aria-live="polite">
+              <span v-if="activeNetworkDownloadAction === 'pdf'" class="landscape-download-spinner" aria-hidden="true" />
+              {{ activeNetworkDownloadAction === 'pdf' ? 'Starting...' : 'Download' }}
+            </span>
+          </button>
+          <button
+            type="button"
+            class="landscape-download-chip"
+            :class="{ 'landscape-download-chip--loading': activeNetworkDownloadAction === 'svg' }"
+            :disabled="activeNetworkDownloadAction !== null"
+            @click="runNetworkDownload('svg', () => downloadNetworkImage('svg'))"
+          >
+            <span class="landscape-download-chip-left">
+              <span class="landscape-download-chip-name">Current network image</span>
+              <span class="landscape-download-chip-format">SVG · Vector · Current view</span>
+            </span>
+            <span class="landscape-download-chip-action" aria-live="polite">
+              <span v-if="activeNetworkDownloadAction === 'svg'" class="landscape-download-spinner" aria-hidden="true" />
+              {{ activeNetworkDownloadAction === 'svg' ? 'Starting...' : 'Download' }}
+            </span>
+          </button>
+          <button
+            type="button"
+            class="landscape-download-chip"
             :class="{ 'landscape-download-chip--loading': activeNetworkDownloadAction === 'current' }"
             :disabled="activeNetworkDownloadAction !== null"
             @click="runNetworkDownload('current', downloadCurrentNetworkCsv)"
@@ -374,12 +499,20 @@
         <el-button @click="networkDownloadDialogOpen = false">Close</el-button>
       </template>
     </el-dialog>
+
+    <ChartImageDownloadDialog
+      v-model="chartDownloadDialogOpen"
+      :title="`Download ${activeChartLabel}`"
+      :chart-label="activeChartLabel"
+      :download="downloadActiveChart"
+      :include-pdf="true"
+      :download-pdf="downloadActiveChartPdf"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from "vue";
-import { Download } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import * as echarts from "echarts";
 import {
@@ -392,6 +525,9 @@ import {
   type PeakGeneContextRequest,
   type PeakGeneContextResponse,
 } from "@/api/analysis";
+import ChartImageDownloadDialog from "@/components/ChartImageDownloadDialog.vue";
+import HelpTooltip from "@/components/analysis/AnalysisHelpTooltip.vue";
+import { downloadChart, downloadChartPdf } from "@/utils/downloadChart";
 import { parseFileContent, parseGenes as parseGenesByFormat } from "@/utils/geneParser";
 
 const baseUrl = import.meta.env.BASE_URL;
@@ -399,6 +535,34 @@ type ReferenceMode = PeakGeneContextRequest["referenceMode"];
 type ResultType = PeakGeneContextRequest["resultType"];
 type ResultTab = "table" | "cell_chart" | "bubble" | "network";
 type NetworkNode = PeakGeneContextResponse["networkData"]["nodes"][number];
+
+const PGC_HELP = {
+  peakInput: "Enter 1–100 genomic regions in hg38 coordinates, one per line. Use chr:start-end or the first three BED columns. Invalid or duplicate regions must be corrected before analysis.",
+  geneInput: "Enter 1–100 human gene symbols separated by line breaks, commas, spaces, or semicolons. Symbols are converted to uppercase, and invalid or duplicate entries must be corrected before analysis.",
+  loadSample: "Loads the built-in GBM Peak-to-Gene example into both input boxes and selects Brain. The peak input uses the first three BED columns, and Dataset remains unrestricted.",
+  clearPeaks: "Removes every peak region from the peak input. Existing results are cleared because they no longer match the current input.",
+  clearGenes: "Removes every gene symbol from the gene input. Existing results are cleared because they no longer match the current input.",
+  inputPeaks: "Number of non-empty peak rows currently entered, including rows that may later be rejected as malformed or duplicate.",
+  validPeaks: "Number of unique peak regions successfully normalised from the current input and eligible for analysis.",
+  invalidPeaks: "Number of malformed or duplicate peak rows. These rows must be corrected or removed before the analysis can run.",
+  inputGenes: "Number of non-empty gene tokens currently entered, including tokens that may later be rejected as malformed or duplicate.",
+  validGenes: "Number of unique, valid gene symbols successfully normalised from the current input and eligible for analysis.",
+  invalidGenes: "Number of malformed or duplicate gene tokens. These tokens must be corrected or removed before the analysis can run.",
+  advancedSettings: "Shows or hides controls for the minimum genomic overlap and the maximum number of result records returned.",
+  tissue: "Required. This limits the search to OSCAR datasets from the selected tissue. It also determines which datasets appear in the Dataset list.",
+  dataset: "Optional. Choose one dataset to search only that sample. Leave it blank to search every available dataset in the selected tissue.",
+  resultType: "General returns one row for each unique matching P2G link. Cell type is available only in marker mode and returns marker-supported rows with their cell type or cluster context.",
+  minOverlap: "Minimum number of base pairs shared by a submitted region and a candidate OSCAR P2G peak. For example, a value of 10 requires at least 10 overlapping bases. Increasing it makes region matching stricter.",
+  maxReturned: "Optional limit applied after all matches are found and ranked. Leave it blank to return every match. If a limit is used, the summary cards still describe the complete matched set, so their totals may be larger than the number of table rows.",
+  runAnalysis: "Validates the inputs, retrieves indexed candidate P2G links for the selected scope, applies the bedtools overlap, adds marker context when requested, and builds the result views.",
+  reset: "Clears all inputs, settings, results, sorting, pagination, progress, and open download dialogs, restoring the default P2G analysis state.",
+  summaryTotal: "Total matches found before the optional maximum-return cap. General mode counts unique P2G links; Cell type mode counts marker-supported context records.",
+  summaryDatasets: "Number of distinct OSCAR datasets represented across the complete matched result set.",
+  summaryPeaks: "Number of distinct P2G peak regions represented across the complete matched result set.",
+  summaryGenes: "Number of distinct linked genes represented across the complete matched result set.",
+  summaryCellTypes: "Number of distinct cell types or clusters represented across the complete marker-supported matched result set.",
+  topCellType: "The cell type or cluster with the greatest number of marker-supported matched records in the complete result set.",
+} as const;
 
 const peakInput = ref("");
 const geneInput = ref("");
@@ -422,8 +586,9 @@ let datasetRequestGeneration = 0;
 const result = ref<PeakGeneContextResponse | null>(null);
 const resultTypeAtRun = ref<ResultType>("general");
 const resTab = ref<ResultTab>("table");
-type NetworkDownloadAction = "image" | "current" | "full";
+type NetworkDownloadAction = "image" | "pdf" | "svg" | "current" | "full";
 const networkDownloadDialogOpen = ref(false);
+const chartDownloadDialogOpen = ref(false);
 const activeNetworkDownloadAction = ref<NetworkDownloadAction | null>(null);
 let networkDownloadFeedbackTimer: number | undefined;
 const pairPage = ref(1);
@@ -432,6 +597,18 @@ const PAIR_PAGE_SIZE = 10;
 type PairSortColumn = "geneName" | "cellType" | "datasetId" | "linkScore" | "linkFdr";
 const pairSortColumn = ref<PairSortColumn | null>(null);
 const pairSortDirection = ref<"asc" | "desc">("desc");
+const activeChartLabel = computed(() =>
+  resTab.value === "cell_chart" ? "cell type distribution" : "peak-to-gene bubble chart"
+);
+const activeResultDownloadHelp = computed(() => {
+  if (resTab.value === "network") {
+    return "Downloads the current network as PNG, PDF, or editable vector SVG, or downloads the current or full network data as CSV.";
+  }
+  if (resTab.value === "table") {
+    return "Downloads every returned result row in the current table sort order as CSV, not only the visible page.";
+  }
+  return "Downloads the currently displayed chart. Choose PNG, PDF, or SVG in the format dialog.";
+});
 
 const CELL_TYPE_CHART_COLORS = [
   "#E8A87C",
@@ -516,44 +693,18 @@ const progressStageLabel = computed(() => ({
   FAILED: "Analysis failed",
 } as Record<string, string>)[progressStage.value] ?? "Processing");
 
-const returnLimitApplied = computed(() => Boolean(
-  result.value && result.value.pairs.length < result.value.summary.totalPairs
-));
-
-const networkHelperLines = computed(() => {
-  if (!result.value) return [
-    "Shows no more than 30 Peak nodes for each Gene so a large result remains readable.",
-    "Nodes are arranged from left to right and automatically spaced; you can drag nodes and zoom the graph.",
-  ];
-  const network = result.value.networkData;
-  const recordLabel = resultTypeAtRun.value === "general" ? "P2G links" : "matched records";
-  const lines = [
-    `Shows no more than ${network.peakLimitPerGene} Peak nodes for each Gene. This view contains ${fmt(network.nodes.length)} unique nodes and ${fmt(network.edges.length)} unique connections.`,
-    `Nodes are arranged from left to right as Peak → Gene${resultTypeAtRun.value === "cell_type" ? " → Cell type" : ""} and automatically spaced. You can drag nodes and zoom the graph.`,
-    `The download menu can save this picture, the CSV rows used by the current graph, or all ${fmt(result.value.pairs.length)} returned ${recordLabel}.`,
-  ];
-  if (returnLimitApplied.value) lines.push(`The return limit kept ${fmt(result.value.pairs.length)} of ${fmt(result.value.summary.totalPairs)} matches.`);
-  return lines;
-});
-
 const resultTabs = computed<Array<{ key: ResultTab; label: string; tipLines?: string[] }>>(() => {
   if (resultTypeAtRun.value === "general") {
     return [
-      { key: "table", label: "Table" },
-      { key: "network", label: "Peak–Gene network", tipLines: networkHelperLines.value },
+      { key: "table", label: "Table", tipLines: ["Matched peak-to-gene links and their statistics."] },
+      { key: "network", label: "Peak–Gene network", tipLines: ["Network view of matched peaks and linked genes."] },
     ];
   }
   return [
-    { key: "table", label: "Table" },
-    { key: "cell_chart", label: "Cell type chart", tipLines: [
-      "Shows the 20 cell types with the most matched rows. Every matched row contributes once to its cell-type count.",
-      "The percentage is that cell type's share of all matched rows, including cell types outside the displayed top 20.",
-    ] },
-    { key: "bubble", label: "Bubble heatmap", tipLines: [
-      "Shows up to the top 15 cell types and top 20 genes, ranked by matched-row count.",
-      "Bubble size is the cell type's share of matches for that gene. Colour is the cell type's share of all matched rows.",
-    ] },
-    { key: "network", label: "Network", tipLines: networkHelperLines.value },
+    { key: "table", label: "Table", tipLines: ["Marker-supported P2G matches with their cell-type context."] },
+    { key: "cell_chart", label: "Cell type chart", tipLines: ["Distribution of matched records across cell types."] },
+    { key: "bubble", label: "Bubble heatmap", tipLines: ["Overview of matched genes across cell types."] },
+    { key: "network", label: "Network", tipLines: ["Network view of matched peaks, genes, and cell types."] },
   ];
 });
 
@@ -753,18 +904,38 @@ function parseGenes(value: string) {
   return { inputCount: tokens.length, invalidCount, values };
 }
 
-function loadBrainSample() {
+function loadGbmSample() {
   peakInput.value = [
-    "chr10:70493274-70493774",
-    "chr5:150081813-150082313",
-    "chr10:70478459-70478959",
-    "chr10:70494887-70495387",
-    "chr5:150086252-150086752",
-    "chr10:70508704-70509204",
-    "chr5:150065281-150065781",
-    "chr5:150082903-150083403"
+    "chr17\t44905586\t44906087",
+    "chr17\t44906128\t44906629",
+    "chr17\t44907141\t44907642",
+    "chr17\t44911338\t44911839",
+    "chr17\t44915299\t44915800",
+    "chr17\t44916649\t44917150",
+    "chr17\t44919895\t44920396",
+    "chr21\t33022685\t33023186",
+    "chr21\t33023593\t33024094",
+    "chr21\t33025486\t33025987",
+    "chr21\t33026033\t33026534",
+    "chr21\t33026787\t33027288",
+    "chr21\t33030047\t33030548",
+    "chr21\t33030666\t33031167",
+    "chr3\t181701983\t181702484",
+    "chr3\t181704134\t181704635",
+    "chr3\t181710650\t181711151",
+    "chr3\t181711531\t181712032",
+    "chr3\t181715875\t181716376",
+    "chr3\t181719188\t181719689",
+    "chr3\t181720246\t181720747",
+    "chr7\t55018735\t55019236",
+    "chr7\t55019271\t55019772",
+    "chr7\t55020088\t55020589",
+    "chr7\t55099878\t55100379",
+    "chr7\t55100481\t55100982",
+    "chr7\t55109323\t55109824",
+    "chr7\t55110893\t55111394"
   ].join("\n");
-  geneInput.value = ["PALD1", "CSF1R"].join("\n");
+  geneInput.value = ["GFAP", "SOX2", "OLIG2", "EGFR"].join("\n");
   datasetId.value = "";
   tissue.value = "Brain";
 }
@@ -910,6 +1081,9 @@ function resetAll() {
   jobProgress.value = 0;
   progressStage.value = "IDLE";
   progressMessage.value = "Waiting to start.";
+  networkDownloadDialogOpen.value = false;
+  chartDownloadDialogOpen.value = false;
+  activeNetworkDownloadAction.value = null;
   disposeCharts();
 }
 
@@ -1160,16 +1334,29 @@ function downloadActiveResult() {
     return;
   }
   if (resTab.value !== "table") {
-    const chart = resTab.value === "cell_chart" ? cellChart : bubbleChart;
-    if (!chart) return;
-    const anchor = document.createElement("a");
-    anchor.href = chart.getDataURL({ type: "png", pixelRatio: 2, backgroundColor: "#ffffff" });
-    anchor.download = `oscar_p2g_${resTab.value}_${new Date().toISOString().slice(0, 10)}.png`;
-    anchor.click();
+    chartDownloadDialogOpen.value = true;
     return;
   }
 
-  downloadResultCsv("oscar_p2g_links", result.value.pairs);
+  downloadResultCsv("oscar_p2g_links", sortedPairs.value);
+}
+
+function downloadActiveChart(format: "png" | "svg") {
+  const chart = resTab.value === "cell_chart" ? cellChart : bubbleChart;
+  return downloadChart(
+    chart,
+    `oscar_p2g_${resTab.value}_${new Date().toISOString().slice(0, 10)}.${format}`,
+    { type: format, pixelRatio: 2, backgroundColor: "#ffffff" }
+  );
+}
+
+function downloadActiveChartPdf() {
+  const chart = resTab.value === "cell_chart" ? cellChart : bubbleChart;
+  return downloadChartPdf(
+    chart,
+    `oscar_p2g_${resTab.value}_${new Date().toISOString().slice(0, 10)}.pdf`,
+    { pixelRatio: 2, backgroundColor: "#ffffff" }
+  );
 }
 
 async function runNetworkDownload(
@@ -1194,13 +1381,20 @@ async function runNetworkDownload(
   }
 }
 
-function downloadNetworkImage() {
-  if (!networkChart) return false;
-  const anchor = document.createElement("a");
-  anchor.href = networkChart.getDataURL({ type: "png", pixelRatio: 2, backgroundColor: "#ffffff" });
-  anchor.download = `oscar_p2g_network_${new Date().toISOString().slice(0, 10)}.png`;
-  anchor.click();
-  return true;
+function downloadNetworkImage(format: "png" | "svg" = "png") {
+  return downloadChart(
+    networkChart,
+    `oscar_p2g_network_${new Date().toISOString().slice(0, 10)}.${format}`,
+    { type: format, pixelRatio: 2, backgroundColor: "#ffffff" }
+  );
+}
+
+function downloadNetworkPdf() {
+  return downloadChartPdf(
+    networkChart,
+    `oscar_p2g_network_${new Date().toISOString().slice(0, 10)}.pdf`,
+    { pixelRatio: 2, backgroundColor: "#ffffff" }
+  );
 }
 
 function downloadCurrentNetworkCsv() {
@@ -1285,12 +1479,12 @@ function csvCell(value: unknown) {
 .pgc-advanced-toggle span.open { transform: rotate(90deg); }
 .pgc-advanced-toggle:disabled { opacity: .5; cursor: not-allowed; }
 .pgc-stat-row { display: flex; gap: 8px; }
-.pgc-stat { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); text-align: center; }
+.pgc-stat { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); text-align: center; }
 .pgc-stat--muted { background: #f3f4f6; border-color: rgba(160,165,175,0.25); color: var(--muted); }
 .pgc-stat--bad { background: #fdf0f0; border-color: rgba(200,125,125,0.22); }
 .pgc-stat--bad .pgc-stat-num { color: #b55a5a; }
 .pgc-stat-num { font-size: 16px; font-weight: 900; color: var(--text); }
-.pgc-stat-label { font-size: 10px; font-weight: 700; color: var(--muted); }
+.pgc-stat-label { display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 10px; font-weight: 700; color: var(--muted); }
 .pgc-hidden-input { display: none; }
 .pgc-illustration { grid-column: 3; grid-row: 1; display: flex; flex-direction: column; min-width: 0; height: 100%; }
 .pgc-slot-img { flex: 1 1 auto; width: 100%; min-height: 0; height: 0; object-fit: contain; border-radius: 10px; }
@@ -1298,12 +1492,14 @@ function csvCell(value: unknown) {
 
 .cte-card { box-sizing: border-box; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow-card); }
 .cte-card-title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 900; margin: 0 0 8px; color: var(--text); }
+.pgc-max-help-wrap { position: relative; display: inline-flex; margin-left: 6px; vertical-align: middle; }
 .cte-max-badge { display: inline-flex; align-items: center; min-height: 20px; padding: 1px 8px; border: 1px solid rgba(95,125,112,0.24); border-radius: 999px; background: rgba(143,165,156,0.10); color: var(--brand-primary-3); font-size: 10px; font-weight: 900; letter-spacing: 0.02em; white-space: nowrap; }
 .cte-hint { margin: 0 0 8px; color: var(--muted); font-size: 12px; font-weight: 700; line-height: 1.45; }
 .cte-textarea { width: 100%; box-sizing: border-box; min-height: 88px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text); font-family: "JetBrains Mono","SFMono-Regular",Consolas,monospace; font-size: 13px; line-height: 1.6; resize: vertical; transition: border-color .18s ease, box-shadow .18s ease; }
 .cte-textarea:focus { outline: none; border-color: var(--border-brand); box-shadow: 0 0 0 3px rgba(143,165,156,0.14); }
 .cte-textarea:disabled { opacity: .55; cursor: not-allowed; }
 .cte-btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.cte-btn-row .soft-btn { min-height: 38px; padding: 8px 16px; border-radius: 11px; }
 .soft-btn { display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font-size: 13px; font-weight: 800; cursor: pointer; transition: border-color .18s ease, background .18s ease; }
 .soft-btn:hover:not(:disabled) { border-color: var(--border-brand); background: var(--surface-2); }
 .soft-btn:disabled { opacity: .5; cursor: not-allowed; }
@@ -1341,9 +1537,10 @@ function csvCell(value: unknown) {
 .cte-card-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); }
 .pgc-label-with-help { display: inline-flex; align-items: center; gap: 5px; width: fit-content; }
 .pgc-tooltip-copy { max-width: 330px; line-height: 1.55; }
-.pgc-upload-wrap { position: relative; display: inline-flex; }
+.pgc-button-help-wrap { position: relative; display: inline-flex; }
 .pgc-help-icon { position: absolute; top: -6px; right: -6px; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 999px; border: 1px solid var(--border-brand); background: var(--surface); color: var(--brand-primary-3); font-size: 9px; font-weight: 900; cursor: help; z-index: 1; }
 .pgc-help-icon--inline { position: static; width: 15px; height: 15px; }
+.pgc-help-icon:focus-visible { outline: 2px solid rgba(78, 133, 118, 0.3); outline-offset: 2px; }
 
 .pgc-progress-card { margin-top: 12px; padding: 14px 15px 13px; border: 1px solid rgba(143,165,156,0.34); border-radius: 13px; background: linear-gradient(145deg, rgba(247,250,248,0.98), rgba(239,246,243,0.92)); box-shadow: inset 0 1px 0 rgba(255,255,255,0.82); }
 .pgc-progress-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 11px; }
@@ -1370,19 +1567,19 @@ function csvCell(value: unknown) {
 
 .pgc-results { display: flex; flex-direction: column; gap: 14px; }
 .pgc-summary-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-.cte-summary-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 16px 10px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-card); text-align: center; }
+.cte-summary-card { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 16px 10px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-card); text-align: center; }
 .sum-num { font-size: 22px; font-weight: 900; color: var(--text); }
-.sum-label { font-size: 11px; font-weight: 800; color: var(--muted); }
-.pgc-result-top-cell { display: flex; align-items: baseline; gap: 7px; padding: 10px 14px; border: 1px solid var(--border-brand); border-radius: 10px; background: rgba(143,165,156,0.06); font-size: 14px; color: var(--text); }
+.sum-label { display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 11px; font-weight: 800; color: var(--muted); }
+.pgc-result-top-cell { position: relative; display: flex; align-items: baseline; gap: 7px; padding: 10px 14px; border: 1px solid var(--border-brand); border-radius: 10px; background: rgba(143,165,156,0.06); font-size: 14px; color: var(--text); }
 .pgc-top-label { color: var(--muted); font-weight: 700; }
 .pgc-top-count { color: var(--brand-primary-3); font-weight: 700; }
 .cte-tabs-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
 .cte-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
-.cte-tab { min-height: 34px; padding: 8px 16px; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13px; font-weight: 800; cursor: pointer; transition: color .18s ease, border-color .18s ease; }
+.cte-tab { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 34px; padding: 8px 16px; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13px; font-weight: 800; cursor: pointer; transition: color .18s ease, border-color .18s ease; }
 .cte-tab:hover { color: var(--text); }
 .cte-tab.active { color: var(--text); border-bottom-color: var(--brand-primary-3); font-weight: 900; }
-.pgc-tab-help { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; margin-left: 3px; border-radius: 999px; border: 1px solid var(--border-brand); background: var(--surface); color: var(--brand-primary-3); font-size: 8px; font-weight: 900; cursor: help; }
-.annotation-download-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border-brand); border-radius: 999px; background: #fffffff2; color: var(--brand-primary-3); box-shadow: inset 0 1px 0 #ffffffcc, 0 6px 14px #12182614; cursor: pointer; margin-bottom: 4px; }
+.pgc-tab-help { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; flex: 0 0 14px; border-radius: 999px; border: 1px solid var(--border-brand); background: var(--surface); color: var(--brand-primary-3); font-size: 8px; font-weight: 900; cursor: help; }
+.pgc-result-download-wrap { margin: 0 6px 7px 12px; }
 .pgc-res-content { min-height: 100px; }
 .pgc-network-view { display: flex; flex-direction: column; }
 .pgc-chart { width: 100%; height: 520px; }
@@ -1390,6 +1587,7 @@ function csvCell(value: unknown) {
 .cte-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 11px; background: var(--surface); }
 .cte-table { width: 100%; min-width: 940px; border-collapse: collapse; font-size: 15px; color: #4f5964; }
 .cte-table th { padding: 12px 16px; text-align: center; vertical-align: middle; border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--surface-2); font-size: 13px; font-weight: 750; color: #7d8792; }
+.pgc-th-label { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
 .cte-table td { padding: 14px 16px; text-align: center; vertical-align: middle; border-bottom: 1px solid var(--border); white-space: nowrap; font-weight: 560; }
 .cte-table tbody tr { transition: background-color .16s ease; }
 .cte-table tbody tr:hover { background: color-mix(in srgb, var(--brand-primary-1) 5%, #ffffff); }
@@ -1408,7 +1606,7 @@ function csvCell(value: unknown) {
 .cte-table code { font-family: "JetBrains Mono", monospace; color: var(--brand-primary-3); font-size: 14px; font-weight: 760; }
 .gsc-sort-th { cursor: pointer; user-select: none; transition: color .16s ease, background-color .16s ease; }
 .gsc-sort-th:hover { color: var(--brand-primary-3); background: color-mix(in srgb, var(--brand-primary-1) 7%, var(--surface-2)); }
-.gsc-sort-arrow { display: inline-block; min-width: 12px; margin-left: 3px; color: var(--brand-primary-3); font-size: 10px; font-weight: 900; }
+.gsc-sort-arrow { display: inline-block; min-width: 12px; margin-left: 4px; color: var(--brand-primary-3); font-size: 10px; font-weight: 900; }
 .cte-pagination { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 0; flex-wrap: wrap; }
 .cte-page-jump { width: 52px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 4px; text-align: center; font-size: 13px; font-weight: 700; color: var(--text); background: var(--surface); }
 .cte-page-jump::-webkit-inner-spin-button,

@@ -53,13 +53,19 @@
 
             <div class="fd-chart-row" v-if="(occurrenceData.totalOccurrences ?? 0) > 0">
               <div class="fd-chart-box">
-                <div class="fd-chart-title">Top 10 datasets</div>
+                <div class="fd-chart-title fd-chart-title--with-help">
+                  <span>Top 10 datasets</span>
+                  <HelpTooltip :text="topDatasetsHelp" label="Top 10 datasets calculation help" />
+                </div>
                 <button class="fd-chart-dl" title="Download chart" @click="openDownloadDialog('dataset')"><el-icon><Download /></el-icon></button>
                 <div v-if="datasetRanking.length === 0" class="fd-chart-empty">No dataset data available</div>
                 <div v-else ref="datasetChartEl" class="fd-chart-canvas" />
               </div>
               <div class="fd-chart-box">
-                <div class="fd-chart-title">Top 10 cell types</div>
+                <div class="fd-chart-title fd-chart-title--with-help">
+                  <span>Top 10 cell types</span>
+                  <HelpTooltip :text="topCellTypesHelp" label="Top 10 cell types calculation help" />
+                </div>
                 <button class="fd-chart-dl" title="Download chart" @click="openDownloadDialog('cellContext')"><el-icon><Download /></el-icon></button>
                 <div v-if="cellContextRanking.length === 0" class="fd-chart-empty">No cell type data available</div>
                 <div v-else ref="cellContextChartEl" class="fd-chart-canvas" />
@@ -217,6 +223,38 @@
         <button
           type="button"
           class="landscape-download-chip"
+          :class="{ 'landscape-download-chip--loading': activeDlAction === 'pdf' }"
+          :disabled="activeDlAction !== null"
+          @click="runDlDialogDownload('pdf', dlDialogPdf)"
+        >
+          <span class="landscape-download-chip-left">
+            <span class="landscape-download-chip-name">Chart document</span>
+            <span class="landscape-download-chip-format">PDF</span>
+          </span>
+          <span class="landscape-download-chip-action" aria-live="polite">
+            <span v-if="activeDlAction === 'pdf'" class="landscape-download-spinner" aria-hidden="true" />
+            {{ activeDlAction === 'pdf' ? 'Starting...' : 'Download' }}
+          </span>
+        </button>
+        <button
+          type="button"
+          class="landscape-download-chip"
+          :class="{ 'landscape-download-chip--loading': activeDlAction === 'svg' }"
+          :disabled="activeDlAction !== null"
+          @click="runDlDialogDownload('svg', dlDialogSvg)"
+        >
+          <span class="landscape-download-chip-left">
+            <span class="landscape-download-chip-name">Chart image</span>
+            <span class="landscape-download-chip-format">SVG · Vector</span>
+          </span>
+          <span class="landscape-download-chip-action" aria-live="polite">
+            <span v-if="activeDlAction === 'svg'" class="landscape-download-spinner" aria-hidden="true" />
+            {{ activeDlAction === 'svg' ? 'Starting...' : 'Download' }}
+          </span>
+        </button>
+        <button
+          type="button"
+          class="landscape-download-chip"
           :class="{ 'landscape-download-chip--loading': activeDlAction === 'table' }"
           :disabled="activeDlAction !== null"
           @click="runDlDialogDownload('table', dlDialogTable)"
@@ -263,7 +301,9 @@ import { useRoute, useRouter } from "vue-router";
 import { buildApiUrl } from "@/config/api";
 import type { BedtoolsAnnotationType, BedtoolsOverlapRecord, BedtoolsSourceOption, BedtoolsSourcesResponse, FeatureOccurrenceResponse, FeatureRegulatoryAnnotationMode, SearchResultDomain } from "@/api/searchResult";
 import { fetchFeatureOccurrence, fetchFeatureRegulatoryAnnotation, fetchReferenceSources, runReferenceIntersect } from "@/api/searchResult";
+import HelpTooltip from "@/components/analysis/AnalysisHelpTooltip.vue";
 import { getBioChartColor, getBioChartColorMap } from "@/utils/chartPalette";
+import { downloadChart, downloadChartPdf } from "@/utils/downloadChart";
 
 type FeatureType = "gene" | "peak";
 type AnnotationSourceCard = {
@@ -342,6 +382,14 @@ const mainTitle = computed(() => isPeakDetail.value ? (region.value || "Peak") :
 const overviewSubtitle = computed(() => isPeakDetail.value
   ? "Marker peak occurrence landscape across OSCAR datasets and cell types."
   : "Marker gene occurrence landscape across OSCAR datasets and cell types.");
+
+const topDatasetsHelp = computed(() => isPeakDetail.value
+  ? "Datasets are ranked by the number of marker-peak records with exactly the displayed genomic coordinates in the selected data domain, summed across cell types and clusters. The ten highest counts are shown, with Dataset ID used to break ties. This identifies datasets in which this peak is most repeatedly reported as a marker; it does not rank expression, effect size, or statistical significance."
+  : "Datasets are ranked by the total number of marker-gene records for the displayed gene in the selected data domain, summed across cell types and clusters. The ten highest counts are shown, with Dataset ID used to break ties. This identifies datasets in which this gene is most repeatedly reported as a marker; it does not rank expression, effect size, or statistical significance.");
+
+const topCellTypesHelp = computed(() => isPeakDetail.value
+  ? "Standardized major cell types are ranked by the total number of marker-peak records with exactly the displayed genomic coordinates, aggregated across matching datasets and clusters. The ten highest counts are shown; Unknown represents records without a mapped major cell type. This highlights the cell types in which this peak most frequently occurs as a marker, not its expression level or statistical significance."
+  : "Standardized major cell types are ranked by the total number of marker-gene records for the displayed gene, aggregated across matching datasets and clusters. The ten highest counts are shown; Unknown represents records without a mapped major cell type. This highlights the cell types in which this gene most frequently occurs as a marker, not its expression level or statistical significance.");
 
 /* ---- Overview data ---- */
 const occurrenceLoading = ref(false);
@@ -577,7 +625,7 @@ async function loadOccurrence() { occurrenceLoading.value=true; occurrenceError.
 
 /* ---- Download dialog ---- */
 type DownloadDialogKind = "dataset" | "cellContext" | "expression";
-type DownloadDialogAction = "image" | "table" | "full";
+type DownloadDialogAction = "image" | "pdf" | "svg" | "table" | "full";
 const dlDialogOpen = ref(false);
 const dlDialogKind = ref<DownloadDialogKind>("dataset");
 const activeDlAction = ref<DownloadDialogAction | null>(null);
@@ -617,7 +665,7 @@ async function runDlDialogDownload(
   }
 }
 
-function dlDialogImage() {
+function downloadDialogChart(format: "png" | "svg") {
   let chart: echarts.ECharts | null = null;
   switch (dlDialogKind.value) {
     case "dataset": chart = datasetChart; break;
@@ -625,9 +673,34 @@ function dlDialogImage() {
     case "expression": chart = expChart; break;
   }
   if (!chart) return false;
-  const url = chart.getDataURL({ type:"png", pixelRatio:2, backgroundColor:"#fff" });
-  const a = document.createElement("a"); a.href = url; a.download = `${dlDialogLabel.value.replace(/\s+/g, "_")}.png`; a.click();
-  return true;
+  return downloadChart(
+    chart,
+    `${dlDialogLabel.value.replace(/\s+/g, "_")}.${format}`,
+    { type: format, pixelRatio: 2, backgroundColor: "#fff" }
+  );
+}
+
+function dlDialogImage() {
+  return downloadDialogChart("png");
+}
+
+function dlDialogPdf() {
+  let chart: echarts.ECharts | null = null;
+  switch (dlDialogKind.value) {
+    case "dataset": chart = datasetChart; break;
+    case "cellContext": chart = cellContextChart; break;
+    case "expression": chart = expChart; break;
+  }
+  if (!chart) return false;
+  return downloadChartPdf(
+    chart,
+    `${dlDialogLabel.value.replace(/\s+/g, "_")}.pdf`,
+    { pixelRatio: 2, backgroundColor: "#fff" }
+  );
+}
+
+function dlDialogSvg() {
+  return downloadDialogChart("svg");
 }
 
 function dlDialogTable() {
@@ -816,6 +889,7 @@ onBeforeUnmount(()=>{ datasetChart?.dispose(); cellContextChart?.dispose(); expC
 .fd-chart-row { display:flex; justify-content:space-between; margin-bottom:18px; }
 .fd-chart-box { width:46%; position:relative; }
 .fd-chart-title { font-size:13px; font-weight:900; color:var(--text); margin-bottom:8px; }
+.fd-chart-title--with-help { display:inline-flex; align-items:center; gap:6px; }
 .fd-exp-left .fd-chart-title { margin-bottom:0; }
 .fd-chart-canvas { width:100%; height:400px; }
 .fd-chart-empty { display:flex; align-items:center; justify-content:center; height:200px; color:var(--muted); font-size:13px; font-weight:700; }

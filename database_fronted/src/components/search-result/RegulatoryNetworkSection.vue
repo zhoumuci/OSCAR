@@ -282,12 +282,22 @@
 
       <div class="table-head">
         <div>
-          <div class="table-title">Graph visible links</div>
+          <div class="table-title-row">
+            <div class="table-title">Graph visible links</div>
+            <el-tooltip placement="top" effect="light" :show-after="180">
+              <template #content>
+                <div class="network-table-help">
+                  <div v-for="line in NETWORK_TABLE_HELP" :key="line">{{ line }}</div>
+                </div>
+              </template>
+              <el-icon class="table-help-icon" aria-label="About graph visible links"><QuestionFilled /></el-icon>
+            </el-tooltip>
+          </div>
           <div class="table-subtitle">{{ visibleLinksSummary }}</div>
         </div>
-        <el-button class="soft-button" :disabled="visibleLinks.length === 0" @click="downloadCsv">
+        <el-button class="soft-button" :disabled="visibleLinks.length === 0" @click="graphDownloadDialogOpen = true">
           <el-icon><Download /></el-icon>
-          <span>CSV</span>
+          <span>Download</span>
         </el-button>
       </div>
 
@@ -302,6 +312,15 @@
         :row-class-name="getLinkRowClassName"
       >
         <el-table-column prop="peak" label="Peak" min-width="190">
+          <template #header>
+            <span class="column-header">
+              <span>Peak</span>
+              <el-tooltip placement="top" effect="light" :show-after="180">
+                <template #content><div v-for="line in NETWORK_COLUMN_TOOLTIPS.peak" :key="line">{{ line }}</div></template>
+                <el-icon class="column-help-icon"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <template #default="{ row }">
             <el-popover
               trigger="click"
@@ -348,30 +367,111 @@
           </template>
         </el-table-column>
         <el-table-column prop="linkedGene" label="Linked gene" min-width="130">
+          <template #header>
+            <span class="column-header">
+              <span>Linked gene</span>
+              <el-tooltip placement="top" effect="light" :show-after="180">
+                <template #content><div v-for="line in NETWORK_COLUMN_TOOLTIPS.linkedGene" :key="line">{{ line }}</div></template>
+                <el-icon class="column-help-icon"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <template #default="{ row }">{{ displayText(row.linkedGene) }}</template>
         </el-table-column>
         <el-table-column v-if="hasDistanceValues" label="Distance to TSS" min-width="140" align="center">
+          <template #header>
+            <span class="column-header">
+              <span>Distance to TSS</span>
+              <el-tooltip placement="top" effect="light" :show-after="180">
+                <template #content><div v-for="line in NETWORK_COLUMN_TOOLTIPS.distanceToTss" :key="line">{{ line }}</div></template>
+                <el-icon class="column-help-icon"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <template #default="{ row }">{{ formatNumber(row.distanceToTss) }}</template>
         </el-table-column>
         <el-table-column label="Link score" min-width="110" align="center">
+          <template #header>
+            <span class="column-header">
+              <span>Link score</span>
+              <el-tooltip placement="top" effect="light" :show-after="180">
+                <template #content><div v-for="line in NETWORK_COLUMN_TOOLTIPS.linkScore" :key="line">{{ line }}</div></template>
+                <el-icon class="column-help-icon"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <template #default="{ row }">{{ formatNumber(row.linkScore ?? row.score) }}</template>
         </el-table-column>
         <el-table-column label="Correlation" min-width="110" align="center">
+          <template #header>
+            <span class="column-header">
+              <span>Correlation</span>
+              <el-tooltip placement="top" effect="light" :show-after="180">
+                <template #content><div v-for="line in NETWORK_COLUMN_TOOLTIPS.correlation" :key="line">{{ line }}</div></template>
+                <el-icon class="column-help-icon"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <template #default="{ row }">{{ formatNumber(row.correlation) }}</template>
         </el-table-column>
         <el-table-column v-if="hasFdrValues" label="FDR" min-width="100" align="center">
+          <template #header>
+            <span class="column-header">
+              <span>FDR</span>
+              <el-tooltip placement="top" effect="light" :show-after="180">
+                <template #content><div v-for="line in NETWORK_COLUMN_TOOLTIPS.fdr" :key="line">{{ line }}</div></template>
+                <el-icon class="column-help-icon"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <template #default="{ row }">{{ formatNumber(row.fdr) }}</template>
         </el-table-column>
         <el-table-column v-if="hasVarQValues" label="VarQ ATAC" min-width="110" align="center">
+          <template #header>
+            <span class="column-header">
+              <span>VarQ ATAC</span>
+              <el-tooltip placement="top" effect="light" :show-after="180">
+                <template #content><div v-for="line in NETWORK_COLUMN_TOOLTIPS.varQAtac" :key="line">{{ line }}</div></template>
+                <el-icon class="column-help-icon"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <template #default="{ row }">{{ formatNumber(row.varQAtac) }}</template>
         </el-table-column>
         <el-table-column v-if="hasVarQValues" label="VarQ RNA" min-width="110" align="center">
+          <template #header>
+            <span class="column-header">
+              <span>VarQ RNA</span>
+              <el-tooltip placement="top" effect="light" :show-after="180">
+                <template #content><div v-for="line in NETWORK_COLUMN_TOOLTIPS.varQRna" :key="line">{{ line }}</div></template>
+                <el-icon class="column-help-icon"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <template #default="{ row }">{{ formatNumber(row.varQRna) }}</template>
         </el-table-column>
         <el-table-column v-if="hasVisibleSourceValues" prop="source" label="Source" min-width="160">
+          <template #header>
+            <span class="column-header">
+              <span>Source</span>
+              <el-tooltip placement="top" effect="light" :show-after="180">
+                <template #content><div v-for="line in NETWORK_COLUMN_TOOLTIPS.source" :key="line">{{ line }}</div></template>
+                <el-icon class="column-help-icon"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <template #default="{ row }">{{ displayText(getVisibleSource(row.source)) }}</template>
         </el-table-column>
         <el-table-column label="Action" min-width="110" align="center" fixed="right">
+          <template #header>
+            <span class="column-header">
+              <span>Action</span>
+              <el-tooltip placement="top" effect="light" :show-after="180">
+                <template #content><div v-for="line in NETWORK_COLUMN_TOOLTIPS.action" :key="line">{{ line }}</div></template>
+                <el-icon class="column-help-icon"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <template #default="{ row }">
             <el-button size="small" plain class="view-button" @click="openLinkDetail(row)">View</el-button>
           </template>
@@ -397,6 +497,50 @@
         />
       </div>
     </template>
+
+    <el-dialog
+      v-model="graphDownloadDialogOpen"
+      width="640px"
+      title="Download graph visible links"
+      custom-class="bubble-dialog network-link-download-dialog"
+      modal-class="network-link-download-overlay"
+      :append-to-body="true"
+      class="float-card"
+    >
+      <div class="network-link-download-body">
+        <div class="network-link-download-meta">
+          <span class="mono">{{ datasetId }}</span>
+          <span>{{ domainChip }}</span>
+          <span>Current graph view</span>
+        </div>
+        <div class="network-link-download-grid">
+          <button type="button" class="network-link-download-chip" @click="downloadVisibleNodesCsv">
+            <span class="network-link-download-copy">
+              <span class="network-link-download-name">Node</span>
+              <span class="network-link-download-description">Unique linked-gene nodes currently visible in the graph.</span>
+            </span>
+            <span class="network-link-download-action">Download</span>
+          </button>
+          <button type="button" class="network-link-download-chip" @click="downloadVisibleEdgesCsv">
+            <span class="network-link-download-copy">
+              <span class="network-link-download-name">Edge</span>
+              <span class="network-link-download-description">All visible edges with their peak and gene endpoint nodes.</span>
+            </span>
+            <span class="network-link-download-action">Download</span>
+          </button>
+          <button type="button" class="network-link-download-chip" @click="downloadVisibleTableCsv">
+            <span class="network-link-download-copy">
+              <span class="network-link-download-name">All</span>
+              <span class="network-link-download-description">The complete Graph visible links table with all available columns.</span>
+            </span>
+            <span class="network-link-download-action">Download</span>
+          </button>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="graphDownloadDialogOpen = false">Close</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog
       v-model="fullLinksDialogVisible"
@@ -475,7 +619,7 @@
 </template>
 
 <script setup lang="ts">
-import { Download, Refresh, Search } from "@element-plus/icons-vue";
+import { Download, InfoFilled, QuestionFilled, Refresh, Search } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -557,6 +701,55 @@ type FullLinksAction = {
   total: number;
 };
 
+const NETWORK_TABLE_HELP = [
+  "Each row represents a peak-to-gene (P2G) link that is currently visible in the network graph above.",
+  "Searching, focusing, or expanding the graph can change which links appear here; table pagination does not change the graph.",
+  "Downloads use the complete current graph view rather than only the rows on the current table page.",
+] as const;
+
+const NETWORK_COLUMN_TOOLTIPS = {
+  peak: [
+    "Genomic coordinates of the regulatory peak at one end of the visible P2G link.",
+    "Open the peak to inspect its complete feature details.",
+  ],
+  linkedGene: [
+    "Gene node connected to the listed peak by this visible P2G link.",
+    "The Node download contains the unique linked genes from the current graph view.",
+  ],
+  distanceToTss: [
+    "Stored genomic distance between the peak and the transcription start site (TSS) of the linked gene.",
+    "The source value is shown without recalculation.",
+  ],
+  linkScore: [
+    "Strength assigned to this peak-to-gene link by the source P2G method.",
+    "A larger value indicates stronger source support and is not recalculated by OSCAR.",
+  ],
+  correlation: [
+    "Correlation value reported for the peak-to-gene relationship by the source P2G analysis.",
+    "Positive and negative values indicate the direction of the reported association.",
+  ],
+  fdr: [
+    "P-value for the stored peak-to-gene link after correction for multiple tests.",
+    "A smaller value means the link is less likely to be due to chance.",
+  ],
+  varQAtac: [
+    "Corrected variance value for the ATAC part of the P2G calculation.",
+    "A smaller value indicates stronger support from accessibility variation.",
+  ],
+  varQRna: [
+    "Corrected variance value for the RNA part of the P2G calculation.",
+    "A smaller value indicates stronger support from RNA variation.",
+  ],
+  source: [
+    "Source label stored for this peak-to-gene link.",
+    "It identifies the dataset or method provenance available for the current record.",
+  ],
+  action: [
+    "Open the link in the detail inspector above.",
+    "The graph selection is updated to the corresponding visible edge.",
+  ],
+} as const;
+
 const props = withDefaults(defineProps<{
   datasetId: string;
   domain: SearchResultDomain;
@@ -634,6 +827,7 @@ const fullLinksPageSize = ref(20);
 const fullLinksTotal = ref(0);
 const fullLinksItems = ref<GraphLink[]>([]);
 const fullLinksError = ref("");
+const graphDownloadDialogOpen = ref(false);
 
 let requestToken = 0;
 let fullLinksRequestToken = 0;
@@ -2004,12 +2198,52 @@ function onFullLinksPageChange(page: number) {
   void loadFullLinks();
 }
 
-function downloadCsv() {
+function downloadVisibleTableCsv() {
   if (!visibleLinks.value.length) return;
   downloadLinksCsv(
     visibleLinks.value,
     `${sanitizeFilenamePart(props.datasetId)}_${props.domain}_graph_visible_regulatory_links.csv`
   );
+  finishGraphVisibleDownload("Complete table");
+}
+
+function downloadVisibleNodesCsv() {
+  if (!visibleLinks.value.length) return;
+  const seen = new Set<string>();
+  const rows = visibleLinks.value.flatMap((link) => {
+    const linkedGene = link.linkedGene || link.geneSymbol;
+    if (!linkedGene || seen.has(linkedGene)) return [];
+    seen.add(linkedGene);
+    return [[linkedGene]];
+  });
+  downloadCsvRows(
+    ["linkedGene"],
+    rows,
+    `${sanitizeFilenamePart(props.datasetId)}_${props.domain}_graph_visible_gene_nodes.csv`
+  );
+  finishGraphVisibleDownload("Node list");
+}
+
+function downloadVisibleEdgesCsv() {
+  if (!visibleLinks.value.length) return;
+  const rows = visibleLinks.value.map((link) => [
+    link.id,
+    link.peak,
+    "peak",
+    link.linkedGene || link.geneSymbol,
+    "gene",
+  ]);
+  downloadCsvRows(
+    ["edgeId", "sourceNode", "sourceType", "targetNode", "targetType"],
+    rows,
+    `${sanitizeFilenamePart(props.datasetId)}_${props.domain}_graph_visible_edges.csv`
+  );
+  finishGraphVisibleDownload("Edge list");
+}
+
+function finishGraphVisibleDownload(label: string) {
+  graphDownloadDialogOpen.value = false;
+  ElMessage.success(`${label} download started.`);
 }
 
 async function downloadFullLinksAllCsv() {
@@ -2070,7 +2304,15 @@ function downloadLinksCsv(rows: GraphLink[], filename: string) {
     row.varQRna ?? "",
     row.source ?? "",
   ]);
-  const csv = [header, ...csvRows]
+  downloadCsvRows(header, csvRows, filename);
+}
+
+function downloadCsvRows(
+  header: string[],
+  rows: Array<Array<string | number>>,
+  filename: string
+) {
+  const csv = [header, ...rows]
     .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
     .join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -3037,6 +3279,37 @@ defineExpose({
   font-weight: 900;
 }
 
+.table-title-row,
+.column-header {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.table-help-icon,
+.column-help-icon {
+  flex: 0 0 auto;
+  color: var(--muted);
+  cursor: help;
+  font-size: 13px;
+  transition: color 0.16s ease;
+}
+
+.table-help-icon:hover,
+.column-help-icon:hover {
+  color: var(--detail-teal-active);
+}
+
+.network-table-help {
+  max-width: 390px;
+  line-height: 1.5;
+}
+
+.network-table-help > div + div {
+  margin-top: 5px;
+}
+
 .table-subtitle {
   margin-top: 2px;
   color: var(--muted);
@@ -3274,6 +3547,115 @@ defineExpose({
   --el-pagination-hover-color: var(--detail-teal-active);
   --el-pagination-button-bg-color: var(--surface);
   --el-pagination-button-disabled-bg-color: var(--surface-2);
+}
+
+:global(.network-link-download-overlay) {
+  background-color: rgba(0, 0, 0, 0.35) !important;
+  backdrop-filter: blur(8px);
+}
+
+:global(.el-dialog.network-link-download-dialog) {
+  max-width: calc(100vw - 28px);
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.18);
+  transform-origin: top center;
+}
+
+:global(.el-dialog.network-link-download-dialog .el-dialog__header) {
+  padding: 16px 48px 12px 18px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0));
+}
+
+:global(.el-dialog.network-link-download-dialog .el-dialog__title) {
+  color: rgba(27, 40, 45, 0.92);
+  font-weight: 900;
+}
+
+:global(.el-dialog.network-link-download-dialog .el-dialog__body) {
+  padding: 14px 18px 16px;
+}
+
+:global(.el-dialog.network-link-download-dialog .el-dialog__footer) {
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.01);
+}
+
+.network-link-download-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 6px 0 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.network-link-download-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.network-link-download-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.network-link-download-chip:hover {
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.network-link-download-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.network-link-download-name {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.network-link-download-description {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.network-link-download-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--brand-primary-3);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 :global(.full-links-dialog.el-dialog) {

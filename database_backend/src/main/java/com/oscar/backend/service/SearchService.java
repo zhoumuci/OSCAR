@@ -271,10 +271,11 @@ public class SearchService {
         return resp;
     }
 
-    public GeneSearchResponse searchByCellType(String cellType) {
-        String normalized = cellType == null ? "" : cellType.trim();
-        if (normalized.isEmpty()) return emptyResponse();
-        List<Map<String, Object>> hits = mapper.findSamplesByCellType(normalized);
+    public GeneSearchResponse searchByCellType(String cellType, String tissue) {
+        String normalizedCellType = cellType == null ? "" : cellType.trim();
+        if (normalizedCellType.isEmpty()) return emptyResponse();
+        String normalizedTissue = normalizeFilter(tissue);
+        List<Map<String, Object>> hits = mapper.findSamplesByCellType(normalizedCellType, normalizedTissue);
         if (hits.isEmpty()) return emptyResponse();
 
         List<GeneSearchResponse.SampleItem> items = new ArrayList<>();

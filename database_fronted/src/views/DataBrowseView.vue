@@ -50,6 +50,16 @@
               clearable
               @keyup.enter="onSearch"
             />
+            <el-button
+              class="soft-button browse-download-button"
+              :loading="downloadLoading"
+              :disabled="sampleLoading || total === 0"
+              :title="`Download all ${total} samples in the current filtered and sorted view`"
+              @click="downloadAllSamples"
+            >
+              <el-icon v-if="!downloadLoading"><Download /></el-icon>
+              <span>CSV</span>
+            </el-button>
             <el-button type="primary" :loading="sampleLoading" @click="onSearch">Search</el-button>
           </div>
 
@@ -73,7 +83,16 @@
               class="tbl"
               @sort-change="onTableSortChange"
             >
-              <el-table-column prop="datasetId" label="DatasetID" min-width="140" fixed sortable="custom">
+              <el-table-column prop="datasetId" label="DatasetID" min-width="150" fixed sortable="custom">
+                <template #header>
+                  <span class="browse-column-header">
+                    <span>DatasetID</span>
+                    <el-tooltip placement="top" effect="light" :show-after="180">
+                      <template #content><div v-for="line in BROWSE_COLUMN_TOOLTIPS.datasetId" :key="line">{{ line }}</div></template>
+                      <el-icon class="column-help-icon" @click.stop><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </span>
+                </template>
                 <template #default="{ row }">
                   <el-link
                     type="primary"
@@ -86,18 +105,97 @@
                 </template>
               </el-table-column>
 
-              <el-table-column prop="sampleType" label="Sample Type" min-width="120" sortable="custom" />
-              <el-table-column prop="tissue" label="Tissue" min-width="100" sortable="custom" />
-              <el-table-column prop="sampleName" label="Sample Name" min-width="180" sortable="custom" />
+              <el-table-column prop="sampleType" label="Sample Type" min-width="135" sortable="custom">
+                <template #header>
+                  <span class="browse-column-header">
+                    <span>Sample Type</span>
+                    <el-tooltip placement="top" effect="light" :show-after="180">
+                      <template #content><div v-for="line in BROWSE_COLUMN_TOOLTIPS.sampleType" :key="line">{{ line }}</div></template>
+                      <el-icon class="column-help-icon" @click.stop><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="tissue" label="Tissue" min-width="105" sortable="custom">
+                <template #header>
+                  <span class="browse-column-header">
+                    <span>Tissue</span>
+                    <el-tooltip placement="top" effect="light" :show-after="180">
+                      <template #content><div v-for="line in BROWSE_COLUMN_TOOLTIPS.tissue" :key="line">{{ line }}</div></template>
+                      <el-icon class="column-help-icon" @click.stop><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="sampleName" label="Sample Name" min-width="180" sortable="custom">
+                <template #header>
+                  <span class="browse-column-header">
+                    <span>Sample Name</span>
+                    <el-tooltip placement="top" effect="light" :show-after="180">
+                      <template #content><div v-for="line in BROWSE_COLUMN_TOOLTIPS.sampleName" :key="line">{{ line }}</div></template>
+                      <el-icon class="column-help-icon" @click.stop><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </span>
+                </template>
+              </el-table-column>
               <el-table-column prop="cells" label="Cells" min-width="110" align="center" sortable="custom">
+                <template #header>
+                  <span class="browse-column-header">
+                    <span>Cells</span>
+                    <el-tooltip placement="top" effect="light" :show-after="180">
+                      <template #content><div v-for="line in BROWSE_COLUMN_TOOLTIPS.cells" :key="line">{{ line }}</div></template>
+                      <el-icon class="column-help-icon" @click.stop><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </span>
+                </template>
                 <template #default="{ row }">
                   {{ formatCells(row.cells) }}
                 </template>
               </el-table-column>
-              <el-table-column prop="platform" label="Platform" min-width="120" sortable="custom" />
-              <el-table-column prop="sourceId" label="SourceID" min-width="120" sortable="custom" />
-              <el-table-column prop="disease" label="Disease" min-width="110" sortable="custom" />
-              <el-table-column prop="sampleSource" label="Sample Source" min-width="150" sortable="custom" />
+              <el-table-column prop="platform" label="Platform" min-width="130" sortable="custom">
+                <template #header>
+                  <span class="browse-column-header">
+                    <span>Platform</span>
+                    <el-tooltip placement="top" effect="light" :show-after="180">
+                      <template #content><div v-for="line in BROWSE_COLUMN_TOOLTIPS.platform" :key="line">{{ line }}</div></template>
+                      <el-icon class="column-help-icon" @click.stop><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="sourceId" label="SourceID" min-width="125" sortable="custom">
+                <template #header>
+                  <span class="browse-column-header">
+                    <span>SourceID</span>
+                    <el-tooltip placement="top" effect="light" :show-after="180">
+                      <template #content><div v-for="line in BROWSE_COLUMN_TOOLTIPS.sourceId" :key="line">{{ line }}</div></template>
+                      <el-icon class="column-help-icon" @click.stop><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="disease" label="Disease" min-width="115" sortable="custom">
+                <template #header>
+                  <span class="browse-column-header">
+                    <span>Disease</span>
+                    <el-tooltip placement="top" effect="light" :show-after="180">
+                      <template #content><div v-for="line in BROWSE_COLUMN_TOOLTIPS.disease" :key="line">{{ line }}</div></template>
+                      <el-icon class="column-help-icon" @click.stop><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="sampleSource" label="Sample Source" min-width="155" sortable="custom">
+                <template #header>
+                  <span class="browse-column-header">
+                    <span>Sample Source</span>
+                    <el-tooltip placement="top" effect="light" :show-after="180">
+                      <template #content><div v-for="line in BROWSE_COLUMN_TOOLTIPS.sampleSource" :key="line">{{ line }}</div></template>
+                      <el-icon class="column-help-icon" @click.stop><InfoFilled /></el-icon>
+                    </el-tooltip>
+                  </span>
+                </template>
+              </el-table-column>
             </el-table>
 
             <div v-if="!sampleLoading && rows.length === 0" class="table-empty">
@@ -125,6 +223,8 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import axios from "axios";
+import { ElMessage } from "element-plus";
+import { Download, InfoFilled } from "@element-plus/icons-vue";
 import type {
   BrowseFacetKey,
   BrowseFacetQuery,
@@ -132,8 +232,48 @@ import type {
   BrowseSample,
   BrowseSampleQuery,
 } from "@/api/databrowse";
-import { fetchBrowseFacets, fetchBrowseSamples } from "@/api/databrowse";
+import { fetchAllBrowseSamples, fetchBrowseFacets, fetchBrowseSamples } from "@/api/databrowse";
 import FacetCard from "@/components/FacetCard.vue";
+import { downloadCsv } from "@/utils/downloadCsv";
+
+const BROWSE_COLUMN_TOOLTIPS = {
+  datasetId: [
+    "Unique OSCAR identifier assigned to this sample.",
+    "Select the identifier to open the complete Sample Details page.",
+  ],
+  sampleType: [
+    "Biological material category recorded for the sample, such as tissue, cell line, sorted cells, organoid, or primary cells.",
+    "This describes the biosample type, not the sequencing platform.",
+  ],
+  tissue: [
+    "Organ or tissue associated with the sample in the imported metadata.",
+    "This value is also used by the Tissue Type filter on the left.",
+  ],
+  sampleName: [
+    "Descriptive sample name supplied by the source metadata.",
+    "It may include preparation, condition, donor, or replicate information.",
+  ],
+  cells: [
+    "Total number of cells reported for the sample in the imported metadata.",
+    "The value is formatted with thousands separators for display; sorting uses the numeric count.",
+  ],
+  platform: [
+    "Experimental or sequencing platform recorded for this sample.",
+    "It identifies the technology used to generate the sample data.",
+  ],
+  sourceId: [
+    "Source identifier or source label supplied in the original sample metadata.",
+    "It is separate from the OSCAR DatasetID and may identify a study, provider, or data collection.",
+  ],
+  disease: [
+    "Disease or condition status recorded for the sample.",
+    "Labels such as Control or Disease describe the source sample's reported condition.",
+  ],
+  sampleSource: [
+    "Original biological source label supplied for the sample.",
+    "It may repeat the Tissue value or provide a more specific source description.",
+  ],
+} as const;
 
 type ViewState = "loading" | "ready" | "error";
 
@@ -153,6 +293,8 @@ const total = ref(0);
 const rows = ref<BrowseSample[]>([]);
 const sortBy = ref("datasetId");
 const sortDir = ref<"asc" | "desc">("asc");
+const downloadLoading = ref(false);
+const loadedSampleQuery = ref<BrowseSampleQuery | null>(null);
 
 const filters = reactive<Record<BrowseFacetKey, string>>({
   species: "",
@@ -300,14 +442,18 @@ async function loadBrowseData() {
     viewState.value = "loading";
   }
 
+  const facetQuery = currentFacetQuery();
+  const sampleQuery = currentSampleQuery();
+
   try {
     const [facetData, sampleData] = await Promise.all([
-      fetchBrowseFacets(currentFacetQuery()),
-      fetchBrowseSamples(currentSampleQuery()),
+      fetchBrowseFacets(facetQuery),
+      fetchBrowseSamples(sampleQuery),
     ]);
 
     applyFacets(facetData);
     applySamples(sampleData);
+    loadedSampleQuery.value = { ...sampleQuery };
     viewState.value = "ready";
   } catch (error) {
     // 被 axios 去重拦截器取消的请求不是错误：新请求会正常回填数据
@@ -325,8 +471,11 @@ async function loadSamplesOnly() {
   errorCode.value = null;
   errorMsg.value = "";
 
+  const sampleQuery = currentSampleQuery();
+
   try {
-    applySamples(await fetchBrowseSamples(currentSampleQuery()));
+    applySamples(await fetchBrowseSamples(sampleQuery));
+    loadedSampleQuery.value = { ...sampleQuery };
     viewState.value = "ready";
   } catch (error) {
     // 被 axios 去重拦截器取消的请求不是错误：新请求会正常回填数据
@@ -373,6 +522,48 @@ function onTableSortChange({ prop, order }: { prop: string; order: string | null
 function onPageChange(nextPage: number) {
   page.value = nextPage;
   loadSamplesOnly();
+}
+
+async function downloadAllSamples() {
+  if (downloadLoading.value || total.value === 0 || !loadedSampleQuery.value) return;
+
+  const query = { ...loadedSampleQuery.value };
+  downloadLoading.value = true;
+
+  try {
+    const samples = await fetchAllBrowseSamples(query);
+    downloadCsv(
+      "oscar_browse_samples.csv",
+      [
+        "DatasetID",
+        "Sample Type",
+        "Tissue",
+        "Sample Name",
+        "Cells",
+        "Platform",
+        "SourceID",
+        "Disease",
+        "Sample Source",
+      ],
+      samples.map((sample) => [
+        sample.datasetId ?? "",
+        sample.sampleType ?? "",
+        sample.tissue ?? "",
+        sample.sampleName ?? "",
+        sample.cells == null ? "" : String(sample.cells),
+        sample.platform ?? "",
+        sample.sourceId ?? "",
+        sample.disease ?? "",
+        sample.sampleSource ?? "",
+      ])
+    );
+    ElMessage.success(`${samples.length} samples exported.`);
+  } catch (error) {
+    console.error("[Browse CSV] Download failed:", error);
+    ElMessage.error("CSV download failed. Please retry.");
+  } finally {
+    downloadLoading.value = false;
+  }
 }
 
 function openDataset(datasetId: string) {
@@ -424,6 +615,10 @@ onMounted(() => {
   width: 100%;
   padding: 18px 0 30px;
   background: var(--bg);
+}
+
+.db-page > .container {
+  width: min(1740px, calc(100% - 24px));
 }
 
 .db-layout {
@@ -587,10 +782,30 @@ onMounted(() => {
 
 .search-row {
   display: grid;
-  grid-template-columns: 70px 1fr 110px;
+  grid-template-columns: 70px 1fr 110px 110px;
   gap: 10px;
   align-items: center;
   margin-bottom: 12px;
+}
+
+.browse-download-button {
+  min-width: 94px;
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 900;
+}
+
+.browse-download-button:hover:not(.is-disabled) {
+  border-color: var(--browse-teal-border);
+  background: var(--surface-2);
+  color: var(--browse-teal-active);
+}
+
+.browse-download-button :deep(span) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .search-label {
@@ -693,6 +908,28 @@ onMounted(() => {
 
 :deep(.tbl th.el-table__cell.is-sortable .caret-wrapper) {
   flex: 0 0 auto;
+  margin-left: 6px;
+}
+
+.browse-column-header {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.column-help-icon {
+  flex: 0 0 auto;
+  color: var(--muted);
+  cursor: help;
+  font-size: 13px;
+  transition: color 0.16s ease;
+}
+
+.column-help-icon:hover {
+  color: var(--browse-teal-active);
 }
 
 .dataset-link {
@@ -801,11 +1038,46 @@ onMounted(() => {
 
   .left {
     position: static;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
     max-height: none;
     overflow: visible;
     padding-right: 0;
   }
+
+  .active-filters {
+    grid-column: 1 / -1;
+  }
+
+  .species-info {
+    margin-bottom: 0;
+  }
+
+  .right,
+  .tbl {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
 }
+
+@media (max-width: 900px) {
+  .left {
+    grid-template-columns: 1fr;
+  }
+
+  .active-filters {
+    grid-column: 1;
+  }
+
+  :deep(.tbl th.el-table__cell),
+  :deep(.tbl td.el-table__cell) {
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+}
+
 @media (max-width: 480px) {
   .search-row { grid-template-columns: 1fr; gap: 8px; }
   .search-label { width: 100%; }

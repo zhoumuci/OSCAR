@@ -10,7 +10,16 @@
       <div class="cte-card spg-builder-card">
         <!-- ── DNA input ───────────────────────────────────── -->
         <section class="cte-builder-section">
-          <div class="cte-card-title">DNA sequence input <span class="cte-max-badge">MAX input: 20 kb</span></div>
+          <div class="cte-card-title">
+            <span>DNA sequence input
+              <span class="spg-max-help-wrap">
+                <span class="cte-max-badge">MAX input: 20 kb</span>
+                <el-tooltip content="Enter one human DNA sequence in plain text or FASTA format. Whitespace and a single FASTA header are removed before validation; the cleaned sequence may contain A, C, G, T, or N and cannot exceed 20 kb." placement="top" effect="light" :show-after="200">
+                  <span class="spg-help-icon" role="button" tabindex="0" aria-label="DNA sequence input help">?</span>
+                </el-tooltip>
+              </span>
+            </span>
+          </div>
 
           <div v-if="displayedInputError" class="input-feedback-card" role="alert">
             <span class="input-feedback-card__icon" aria-hidden="true">!</span>
@@ -50,12 +59,22 @@
                 <span class="spg-help-icon">?</span>
               </el-tooltip>
             </span>
-            <button type="button" class="soft-btn" :disabled="loading" @click="loadExample">
-              <span>📋</span> Load example
-            </button>
-            <button type="button" class="soft-btn" :disabled="loading" @click="clearInput">
-              <span>✕</span> Clear
-            </button>
+            <span class="spg-button-help-wrap">
+              <button type="button" class="soft-btn" :disabled="loading" @click="loadExample">
+                <span>📋</span> Load example
+              </button>
+              <el-tooltip content="Loads a valid example DNA sequence and updates the sequence-quality summary below." placement="top" effect="light" :show-after="200">
+                <span class="spg-help-icon" role="button" tabindex="0" aria-label="Load sequence example help">?</span>
+              </el-tooltip>
+            </span>
+            <span class="spg-button-help-wrap">
+              <button type="button" class="soft-btn" :disabled="loading" @click="clearInput">
+                <span>✕</span> Clear
+              </button>
+              <el-tooltip content="Clears the DNA sequence and its validation message. Analysis settings are kept unchanged." placement="top" effect="light" :show-after="200">
+                <span class="spg-help-icon" role="button" tabindex="0" aria-label="Clear sequence help">?</span>
+              </el-tooltip>
+            </span>
           </div>
 
           <div v-if="seqStats" class="spg-qc-row">
@@ -91,14 +110,18 @@
           <div class="cte-settings-main">
             <div class="cte-fields">
               <label class="cte-field">
-                <span class="cte-field-label">Genome build</span>
+                <span class="cte-field-label cte-field-label--help">Genome build
+                  <el-tooltip content="BLAST maps the input sequence to the human hg38 reference genome. This value is fixed so every returned region and OSCAR peak uses the same coordinate system." placement="top-start" effect="light" :show-after="200"><span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Genome build help">?</span></el-tooltip>
+                </span>
                 <el-select v-model="genomeBuild" class="cte-select" popper-class="oscar-select-popper" size="small" disabled>
                   <el-option label="hg38" value="hg38" />
                 </el-select>
               </label>
 
               <label class="cte-field">
-                <span class="cte-field-label">Reference scope</span>
+                <span class="cte-field-label cte-field-label--help">Reference scope
+                  <el-tooltip placement="top-start" effect="light" :show-after="200"><template #content><span class="spg-field-help"><span>This setting does not change the BLAST mapping. It controls where OSCAR evidence is searched after a genomic region is selected.</span><span><strong>All OSCAR datasets:</strong> search regulatory evidence in every dataset.</span><span><strong>Single OSCAR dataset:</strong> search only the dataset selected in the popup.</span></span></template><span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Reference scope help">?</span></el-tooltip>
+                </span>
                 <div class="cte-ref-scope-row">
                   <el-select v-model="referenceScope" class="cte-select" popper-class="oscar-select-popper" size="small" :disabled="loading" @change="onReferenceScopeChange">
                     <el-option label="All OSCAR datasets" value="all" />
@@ -117,10 +140,10 @@
                   <el-tooltip placement="top-start" effect="light" :show-after="200">
                     <template #content>
                       <span class="spg-field-help">
-                        <span><strong>Peak-to-gene links:</strong> returns stored links whose peak overlaps the selected hg38 match. The linked gene comes from the P2G table.</span>
-                        <span><strong>Marker peaks:</strong> first finds marker peaks overlapping the selected hg38 match, then looks up P2G links with the same dataset, data type, chromosome, start, and end so linked genes can be shown when available.</span>
-                        <span><strong>Both:</strong> shows a combined overlapping-peak overview followed by separate P2G-link and marker-peak tables. Choosing only one option does not show tables from the other option.</span>
-                        <span>The return limit in Advanced settings is applied to each selected result query. Leave it empty to return all matches.</span>
+                        <span>Controls which OSCAR records are retrieved after BLAST selects an hg38 region.</span>
+                        <span><strong>Peak-to-gene links:</strong> return stored P2G links whose peak overlaps the selected region.</span>
+                        <span><strong>Marker peaks:</strong> return marker peaks that overlap the selected region and show linked genes when available.</span>
+                        <span><strong>Both:</strong> return both types and display them in separate result tables.</span>
                       </span>
                     </template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Show results help">?</span>
@@ -154,10 +177,11 @@
                   <el-tooltip placement="top-start" effect="light" :show-after="200">
                     <template #content>
                       <span class="spg-field-help">
-                        <span><strong>Auto:</strong> uses blastn-short for sequences up to 50 bases. For longer sequences, it first tries megablast and automatically retries with blastn only when megablast returns no match.</span>
-                        <span><strong>megablast:</strong> provides fast genomic mapping for highly similar sequences, especially long sequences from hg38. It may omit weaker or partial similarities.</span>
-                        <span><strong>blastn:</strong> is slower but more sensitive to mismatches and local similarities. Long sequences, particularly repeat-rich sequences approaching 20 kb, can take substantially longer and return many local alignments.</span>
-                        <span><strong>blastn-short:</strong> is tuned for short nucleotide queries. Selecting a task manually overrides Auto.</span>
+                        <span>Chooses the BLAST search algorithm.</span>
+                        <span><strong>Auto:</strong> uses blastn-short for sequences up to 50 bases. Longer sequences use megablast first and retry with blastn only if no match is found.</span>
+                        <span><strong>megablast:</strong> fast and suitable for long sequences expected to closely match hg38.</span>
+                        <span><strong>blastn:</strong> slower but more sensitive to mismatches or partial similarity.</span>
+                        <span><strong>blastn-short:</strong> tuned for short nucleotide sequences.</span>
                       </span>
                     </template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="BLAST task help">?</span>
@@ -176,8 +200,9 @@
                   <el-tooltip placement="top-start" effect="light" :show-after="200">
                     <template #content>
                       <span class="spg-field-help">
-                        <span>Limits BLAST subject sequences, not genomic loci.</span>
-                        <span>One subject, such as a chromosome or contig, may contain multiple HSPs.</span>
+                        <span>Limits the number of BLAST reference subjects considered, such as chromosomes or contigs.</span>
+                        <span>It is not a direct limit on final genomic regions because one subject can contain several alignments.</span>
+                        <span>A larger value can find more alternative loci but may take longer.</span>
                       </span>
                     </template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Max target sequences help">?</span>
@@ -191,8 +216,8 @@
                   <el-tooltip placement="top-start" effect="light" :show-after="200">
                     <template #content>
                       <span class="spg-field-help">
-                        <span>Maximum HSP alignments retained for each BLAST subject.</span>
-                        <span>Keeping alternatives is required to assess multi-locus ambiguity.</span>
+                        <span>Limits how many alignment segments are kept for each BLAST reference subject.</span>
+                        <span>A larger value preserves more possible loci, which helps detect ambiguous mapping, but increases processing time.</span>
                       </span>
                     </template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Max HSPs per target help">?</span>
@@ -206,8 +231,8 @@
                   <el-tooltip placement="top-start" effect="light" :show-after="200">
                     <template #content>
                       <span class="spg-field-help">
-                        <span>Maximum BLAST E-value accepted by the search.</span>
-                        <span>Smaller values require stronger sequence-match results.</span>
+                        <span>Largest BLAST E-value that will be accepted.</span>
+                        <span>A smaller cutoff is stricter and keeps only stronger sequence matches; a larger cutoff allows weaker matches.</span>
                       </span>
                     </template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="E-value cutoff help">?</span>
@@ -216,11 +241,15 @@
                 <el-input-number v-model="evalueCutoff" aria-label="E-value cutoff" class="cte-number" size="small" :min="0.000000000001" :step="0.00001" :precision="8" :disabled="loading" />
               </div>
               <label class="cte-field">
-                <span class="cte-field-label">Flanking region (bp)</span>
+                <span class="cte-field-label cte-field-label--help">Flanking region (bp)
+                  <el-tooltip content="After BLAST selects an hg38 region, this number of bases is added to both its start and end before OSCAR peaks are searched. It does not change the BLAST alignment. Use 0 to search only the aligned region." placement="top-start" effect="light" :show-after="200"><span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Flanking region help">?</span></el-tooltip>
+                </span>
                 <el-input-number v-model="flankBp" class="cte-number" size="small" :min="0" :max="1000000" :disabled="loading" />
               </label>
               <label class="cte-field">
-                <span class="cte-field-label">Maximum returned records</span>
+                <span class="cte-field-label cte-field-label--help">Maximum returned records
+                  <el-tooltip content="Limits the number of OSCAR evidence rows returned for each selected result query. It does not limit BLAST candidates. Leave it empty to return all matching evidence; using a limit can make a result table incomplete." placement="top-start" effect="light" :show-after="200"><span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Maximum returned records help">?</span></el-tooltip>
+                </span>
                 <el-input-number v-model="resultLimit" class="cte-number" size="small" :min="1" placeholder="All" :disabled="loading" />
                 <small class="cte-field-hint">Leave empty to return all matched results.</small>
               </label>
@@ -229,11 +258,17 @@
         </div>
 
         <div class="cte-card-actions">
-          <button type="button" class="primary-btn" :disabled="loading || !seqStats || !seqStats.valid || sequenceLimitExceeded" @click="runMapping">
-            <span v-if="loading" class="btn-spinner"></span>
-            {{ loading ? "Mapping…" : "Run sequence mapping" }}
-          </button>
-          <button type="button" class="soft-btn" :disabled="loading" @click="resetAll">Reset</button>
+          <span class="spg-button-help-wrap">
+            <button type="button" class="primary-btn" :disabled="loading || !seqStats || !seqStats.valid || sequenceLimitExceeded" @click="runMapping">
+              <span v-if="loading" class="btn-spinner"></span>
+              {{ loading ? "Mapping…" : "Run sequence mapping" }}
+            </button>
+            <el-tooltip content="Validates the input, maps it to hg38 with the selected BLAST settings, selects a candidate locus, and retrieves the requested OSCAR evidence." placement="top" effect="light" :show-after="200"><span class="spg-help-icon" role="button" tabindex="0" aria-label="Run sequence mapping help">?</span></el-tooltip>
+          </span>
+          <span class="spg-button-help-wrap">
+            <button type="button" class="soft-btn" :disabled="loading" @click="resetAll">Reset</button>
+            <el-tooltip content="Restores the sequence input and all analysis settings to their defaults and removes the current result." placement="top" effect="light" :show-after="200"><span class="spg-help-icon" role="button" tabindex="0" aria-label="Reset sequence analysis help">?</span></el-tooltip>
+          </span>
         </div>
         <div v-if="loading" class="spg-progress-card" role="status" aria-live="polite">
           <div class="spg-progress-head">
@@ -300,10 +335,10 @@
       <div v-if="evidenceError" class="cte-input-error spg-evidence-error">{{ evidenceError }}</div>
 
       <div class="spg-summary-row">
-        <div class="cte-summary-card"><span class="sum-num">{{ fmt(result?.summary?.blastHitCount ?? 0) }}</span><span class="sum-label">BLAST hits</span></div>
-        <div class="cte-summary-card"><span class="sum-num">{{ fmt(result?.summary?.candidateLocusCount ?? 0) }}</span><span class="sum-label">Mapped genomic regions</span></div>
-        <div class="cte-summary-card"><span class="sum-num">{{ fmt(result?.summary?.overlappingPeakCount ?? 0) }}</span><span class="sum-label">Overlapping peaks</span></div>
-        <div class="cte-summary-card"><span class="sum-num">{{ fmt(result?.summary?.linkedGeneCount ?? 0) }}</span><span class="sum-label">Linked genes</span></div>
+        <div class="cte-summary-card"><span class="sum-num">{{ fmt(result?.summary?.blastHitCount ?? 0) }}</span><span class="sum-label">BLAST hits</span><HelpTooltip text="Number of BLAST alignments returned for the submitted sequence under the selected search settings." label="BLAST hits help" corner /></div>
+        <div class="cte-summary-card"><span class="sum-num">{{ fmt(result?.summary?.candidateLocusCount ?? 0) }}</span><span class="sum-label">Mapped genomic regions</span><HelpTooltip text="Number of distinct hg38 candidate loci retained after BLAST alignments are classified and ranked." label="Mapped genomic regions help" corner /></div>
+        <div class="cte-summary-card"><span class="sum-num">{{ fmt(result?.summary?.overlappingPeakCount ?? 0) }}</span><span class="sum-label">Overlapping peaks</span><HelpTooltip text="Number of OSCAR peaks that overlap the selected hg38 candidate interval, including the configured flanking region." label="Overlapping peaks help" corner /></div>
+        <div class="cte-summary-card"><span class="sum-num">{{ fmt(result?.summary?.linkedGeneCount ?? 0) }}</span><span class="sum-label">Linked genes</span><HelpTooltip text="Number of unique genes linked to returned peaks for the currently selected BLAST candidate." label="Linked genes help" corner /></div>
       </div>
 
       <div v-if="selectedHit" class="spg-top-hit-cards">
@@ -313,13 +348,13 @@
           </div>
         </div>
         <div class="spg-detail-grid">
-          <div class="spg-detail-card"><span class="spg-detail-val">{{ selectedHit.chromosome }}:{{ fmt(selectedHit.start) }}-{{ fmt(selectedHit.end) }}</span><span class="spg-detail-label">Selected region</span></div>
-          <div class="spg-detail-card"><span class="spg-detail-val">{{ selectedHit.strand }}</span><span class="spg-detail-label">Strand</span></div>
-          <div class="spg-detail-card"><span class="spg-detail-val">{{ selectedHit.identity }}%</span><span class="spg-detail-label">Identity</span></div>
-          <div class="spg-detail-card"><span class="spg-detail-val">{{ selectedHit.alignLen }} bp</span><span class="spg-detail-label">Align length</span></div>
-          <div class="spg-detail-card"><span class="spg-detail-val">{{ selectedHit.queryCoverage }}%</span><span class="spg-detail-label">Query coverage</span></div>
-          <div class="spg-detail-card"><span class="spg-detail-val">{{ selectedHit.evalue }}</span><span class="spg-detail-label">E-value</span></div>
-          <div class="spg-detail-card"><span class="spg-detail-val">{{ selectedHit.bitScore }}</span><span class="spg-detail-label">Bit score</span></div>
+          <div class="spg-detail-card"><span class="spg-detail-val">{{ selectedHit.chromosome }}:{{ fmt(selectedHit.start) }}-{{ fmt(selectedHit.end) }}</span><span class="spg-detail-label">Selected region</span><HelpTooltip text="The hg38 genomic interval currently used to retrieve OSCAR regulatory evidence." label="Selected region help" corner /></div>
+          <div class="spg-detail-card"><span class="spg-detail-val">{{ selectedHit.strand }}</span><span class="spg-detail-label">Strand</span><HelpTooltip text="Orientation of the sequence alignment on the hg38 reference genome." label="Strand help" corner /></div>
+          <div class="spg-detail-card"><span class="spg-detail-val">{{ selectedHit.identity }}%</span><span class="spg-detail-label">Identity</span><HelpTooltip text="Percentage of identical bases within this local BLAST alignment." label="Identity help" corner /></div>
+          <div class="spg-detail-card"><span class="spg-detail-val">{{ selectedHit.alignLen }} bp</span><span class="spg-detail-label">Align length</span><HelpTooltip text="Number of query and reference positions included in this BLAST alignment." label="Alignment length help" corner /></div>
+          <div class="spg-detail-card"><span class="spg-detail-val">{{ selectedHit.queryCoverage }}%</span><span class="spg-detail-label">Query coverage</span><HelpTooltip text="Percentage of the cleaned input sequence covered by this alignment." label="Query coverage help" corner /></div>
+          <div class="spg-detail-card"><span class="spg-detail-val">{{ selectedHit.evalue }}</span><span class="spg-detail-label">E-value</span><HelpTooltip text="BLAST expectation value for this alignment; smaller values indicate stronger sequence-match evidence." label="E-value help" corner /></div>
+          <div class="spg-detail-card"><span class="spg-detail-val">{{ selectedHit.bitScore }}</span><span class="spg-detail-label">Bit score</span><HelpTooltip text="Normalised BLAST alignment score; larger values indicate a stronger alignment." label="Bit score help" corner /></div>
         </div>
       </div>
 
@@ -335,11 +370,14 @@
 
       <div class="cte-tabs-row">
         <div class="cte-tabs">
-          <button v-for="tab in resultTabs" :key="tab.key" type="button" class="cte-tab" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">{{ tab.label }}</button>
+          <button v-for="tab in resultTabs" :key="tab.key" type="button" class="cte-tab" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">
+            <span>{{ tab.label }}</span><HelpTooltip :text="tab.help" :label="`${tab.label} help`" />
+          </button>
         </div>
-        <el-tooltip content="Download current table" placement="top" effect="light" :show-after="220">
-          <button type="button" class="annotation-download-button" :disabled="!activeTableRows?.length" aria-label="Download current table" @click="downloadCurrentTable"><el-icon><Download /></el-icon></button>
-        </el-tooltip>
+        <span class="spg-button-help-wrap spg-result-download-wrap">
+          <button type="button" class="soft-btn" :disabled="!activeTableRows?.length" @click="downloadCurrentTable"><span>⇩</span> Download</button>
+          <el-tooltip content="Downloads all rows from the currently selected result table as CSV, using the table's current result type rather than only the visible page." placement="top" effect="light" :show-after="200"><span class="spg-help-icon" role="button" tabindex="0" aria-label="Download current table help">?</span></el-tooltip>
+        </span>
       </div>
 
       <div class="spg-tab-content" :class="{ 'spg-tab-loading': evidenceLoading }">
@@ -349,7 +387,17 @@
         </div>
         <div v-if="activeTab === 'blastHits'" class="cte-table-wrap">
           <table class="cte-table spg-candidate-table">
-            <thead><tr><th>Rank</th><th>Candidate region</th><th>Strand</th><th>Identity</th><th>Query coverage</th><th>E-value</th><th>Bit score</th><th>Top-score ratio</th><th>Select</th></tr></thead>
+            <thead><tr>
+              <th><span class="spg-th-label"><span>Rank</span><HelpTooltip text="Order of the BLAST candidate, with the strongest match ranked first." label="Rank column help" /></span></th>
+              <th><span class="spg-th-label"><span>Candidate region</span><HelpTooltip text="hg38 genomic coordinates matched by the input sequence." label="Candidate region column help" /></span></th>
+              <th><span class="spg-th-label"><span>Strand</span><HelpTooltip text="Alignment direction on the hg38 genome." label="Strand column help" /></span></th>
+              <th><span class="spg-th-label"><span>Identity</span><HelpTooltip text="Percentage of aligned bases that are identical." label="Identity column help" /></span></th>
+              <th><span class="spg-th-label"><span>Query coverage</span><HelpTooltip text="Percentage of the input sequence covered by this alignment." label="Query coverage column help" /></span></th>
+              <th><span class="spg-th-label"><span>E-value</span><HelpTooltip text="Chance expectation for the match. Smaller values indicate stronger evidence." label="E-value column help" /></span></th>
+              <th><span class="spg-th-label"><span>Bit score</span><HelpTooltip text="BLAST alignment score. Larger values indicate a stronger match." label="Bit score column help" /></span></th>
+              <th><span class="spg-th-label"><span>Top-score ratio</span><HelpTooltip text="This candidate's bit score divided by the best candidate's bit score." label="Top-score ratio column help" /></span></th>
+              <th><span class="spg-th-label"><span>Select</span><HelpTooltip text="Choose which mapped region is used to retrieve OSCAR regulatory evidence." label="Select column help" /></span></th>
+            </tr></thead>
             <tbody>
               <tr v-if="!paginatedBlastRows.length"><td colspan="9" class="cte-no-data">No BLAST candidates found.</td></tr>
               <tr v-for="row in paginatedBlastRows" :key="row.hitId" :class="{ selected: row.hitId === result?.evidenceHitId, equivalent: row.nearEquivalent }">
@@ -365,7 +413,14 @@
 
         <div v-if="activeTab === 'allPeaks'" class="cte-table-wrap">
           <table class="cte-table">
-            <thead><tr><th class="gsc-sort-th" @click="toggleSort('datasetId')">Dataset <span class="gsc-sort-arrow">{{ sortArrow('datasetId') }}</span></th><th>Peak region</th><th class="gsc-sort-th" @click="toggleSort('source')">Source <span class="gsc-sort-arrow">{{ sortArrow('source') }}</span></th><th class="gsc-sort-th" @click="toggleSort('linkedGenes')">Linked genes <span class="gsc-sort-arrow">{{ sortArrow('linkedGenes') }}</span></th><th class="gsc-sort-th" @click="toggleSort('linkFdr')">FDR <span class="gsc-sort-arrow">{{ sortArrow('linkFdr') }}</span></th><th class="gsc-sort-th" @click="toggleSort('linkScore')">Link score <span class="gsc-sort-arrow">{{ sortArrow('linkScore') }}</span></th></tr></thead>
+            <thead><tr>
+              <th class="gsc-sort-th" @click="toggleSort('datasetId')"><span class="spg-th-label"><span>Dataset</span><HelpTooltip text="OSCAR dataset containing the overlapping peak." label="Dataset column help" /><span class="gsc-sort-arrow">{{ sortArrow('datasetId') }}</span></span></th>
+              <th><span class="spg-th-label"><span>Peak region</span><HelpTooltip text="hg38 coordinates of the overlapping OSCAR peak." label="Peak region column help" /></span></th>
+              <th class="gsc-sort-th" @click="toggleSort('source')"><span class="spg-th-label"><span>Source</span><HelpTooltip text="Whether the peak came from a P2G link, a marker peak, or both." label="Source column help" /><span class="gsc-sort-arrow">{{ sortArrow('source') }}</span></span></th>
+              <th class="gsc-sort-th" @click="toggleSort('linkedGenes')"><span class="spg-th-label"><span>Linked genes</span><HelpTooltip text="Genes linked to this peak in OSCAR, when available." label="Linked genes column help" /><span class="gsc-sort-arrow">{{ sortArrow('linkedGenes') }}</span></span></th>
+              <th class="gsc-sort-th" @click="toggleSort('linkFdr')"><span class="spg-th-label"><span>FDR</span><HelpTooltip text="FDR reported for the strongest available peak-to-gene link." label="FDR column help" /><span class="gsc-sort-arrow">{{ sortArrow('linkFdr') }}</span></span></th>
+              <th class="gsc-sort-th" @click="toggleSort('linkScore')"><span class="spg-th-label"><span>Link score</span><HelpTooltip text="Score reported for the strongest available peak-to-gene link." label="Link score column help" /><span class="gsc-sort-arrow">{{ sortArrow('linkScore') }}</span></span></th>
+            </tr></thead>
             <tbody>
               <tr v-if="!paginatedAllPeakRows.length"><td colspan="6" class="cte-no-data">No overlapping peaks found for the selected candidate.</td></tr>
               <tr v-for="(row, i) in paginatedAllPeakRows" :key="(currentPage - 1) * PAGE_SIZE + i">
@@ -383,7 +438,14 @@
 
         <div v-if="activeTab === 'p2g'" class="cte-table-wrap">
           <table class="cte-table">
-            <thead><tr><th class="gsc-sort-th" @click="toggleSort('datasetId')">Dataset <span class="gsc-sort-arrow">{{ sortArrow('datasetId') }}</span></th><th>Peak region</th><th class="gsc-sort-th" @click="toggleSort('geneName')">Linked gene <span class="gsc-sort-arrow">{{ sortArrow('geneName') }}</span></th><th class="gsc-sort-th" @click="toggleSort('correlation')">Correlation <span class="gsc-sort-arrow">{{ sortArrow('correlation') }}</span></th><th class="gsc-sort-th" @click="toggleSort('fdr')">FDR <span class="gsc-sort-arrow">{{ sortArrow('fdr') }}</span></th><th class="gsc-sort-th" @click="toggleSort('linkScore')">Link score <span class="gsc-sort-arrow">{{ sortArrow('linkScore') }}</span></th></tr></thead>
+            <thead><tr>
+              <th class="gsc-sort-th" @click="toggleSort('datasetId')"><span class="spg-th-label"><span>Dataset</span><HelpTooltip text="OSCAR dataset containing this peak-to-gene link." label="Dataset column help" /><span class="gsc-sort-arrow">{{ sortArrow('datasetId') }}</span></span></th>
+              <th><span class="spg-th-label"><span>Peak region</span><HelpTooltip text="hg38 coordinates of the linked peak." label="Peak region column help" /></span></th>
+              <th class="gsc-sort-th" @click="toggleSort('geneName')"><span class="spg-th-label"><span>Linked gene</span><HelpTooltip text="Gene connected to the peak by this OSCAR P2G link." label="Linked gene column help" /><span class="gsc-sort-arrow">{{ sortArrow('geneName') }}</span></span></th>
+              <th class="gsc-sort-th" @click="toggleSort('correlation')"><span class="spg-th-label"><span>Correlation</span><HelpTooltip text="Correlation reported between the peak signal and gene signal." label="Correlation column help" /><span class="gsc-sort-arrow">{{ sortArrow('correlation') }}</span></span></th>
+              <th class="gsc-sort-th" @click="toggleSort('fdr')"><span class="spg-th-label"><span>FDR</span><HelpTooltip text="Multiple-testing adjusted significance of the peak-to-gene link." label="FDR column help" /><span class="gsc-sort-arrow">{{ sortArrow('fdr') }}</span></span></th>
+              <th class="gsc-sort-th" @click="toggleSort('linkScore')"><span class="spg-th-label"><span>Link score</span><HelpTooltip text="Strength score reported for the peak-to-gene link." label="Link score column help" /><span class="gsc-sort-arrow">{{ sortArrow('linkScore') }}</span></span></th>
+            </tr></thead>
             <tbody>
               <tr v-if="!paginatedP2gRows.length"><td colspan="6" class="cte-no-data">No peak-to-gene links found for the selected candidate.</td></tr>
               <tr v-for="(row, i) in paginatedP2gRows" :key="(currentPage - 1) * PAGE_SIZE + i">
@@ -402,7 +464,15 @@
 
         <div v-if="activeTab === 'markerPeaks'" class="cte-table-wrap">
           <table class="cte-table">
-            <thead><tr><th class="gsc-sort-th" @click="toggleSort('datasetId')">Dataset <span class="gsc-sort-arrow">{{ sortArrow('datasetId') }}</span></th><th>Domain</th><th class="gsc-sort-th" @click="toggleSort('groupName')">Cluster <span class="gsc-sort-arrow">{{ sortArrow('groupName') }}</span></th><th>Peak region</th><th class="gsc-sort-th" @click="toggleSort('linkedGenes')">Linked genes <span class="gsc-sort-arrow">{{ sortArrow('linkedGenes') }}</span></th><th class="gsc-sort-th" @click="toggleSort('linkFdr')">FDR <span class="gsc-sort-arrow">{{ sortArrow('linkFdr') }}</span></th><th class="gsc-sort-th" @click="toggleSort('linkScore')">Link score <span class="gsc-sort-arrow">{{ sortArrow('linkScore') }}</span></th></tr></thead>
+            <thead><tr>
+              <th class="gsc-sort-th" @click="toggleSort('datasetId')"><span class="spg-th-label"><span>Dataset</span><HelpTooltip text="OSCAR dataset containing this marker peak." label="Dataset column help" /><span class="gsc-sort-arrow">{{ sortArrow('datasetId') }}</span></span></th>
+              <th><span class="spg-th-label"><span>Domain</span><HelpTooltip text="Marker-analysis domain used for this peak, such as gene expression or gene score." label="Domain column help" /></span></th>
+              <th class="gsc-sort-th" @click="toggleSort('groupName')"><span class="spg-th-label"><span>Cluster</span><HelpTooltip text="Cell cluster for which this peak is a marker." label="Cluster column help" /><span class="gsc-sort-arrow">{{ sortArrow('groupName') }}</span></span></th>
+              <th><span class="spg-th-label"><span>Peak region</span><HelpTooltip text="hg38 coordinates of the marker peak." label="Peak region column help" /></span></th>
+              <th class="gsc-sort-th" @click="toggleSort('linkedGenes')"><span class="spg-th-label"><span>Linked genes</span><HelpTooltip text="Genes linked to this marker peak in OSCAR, when available." label="Linked genes column help" /><span class="gsc-sort-arrow">{{ sortArrow('linkedGenes') }}</span></span></th>
+              <th class="gsc-sort-th" @click="toggleSort('linkFdr')"><span class="spg-th-label"><span>FDR</span><HelpTooltip text="FDR reported for the strongest available peak-to-gene link." label="FDR column help" /><span class="gsc-sort-arrow">{{ sortArrow('linkFdr') }}</span></span></th>
+              <th class="gsc-sort-th" @click="toggleSort('linkScore')"><span class="spg-th-label"><span>Link score</span><HelpTooltip text="Score reported for the strongest available peak-to-gene link." label="Link score column help" /><span class="gsc-sort-arrow">{{ sortArrow('linkScore') }}</span></span></th>
+            </tr></thead>
             <tbody>
               <tr v-if="!paginatedMarkerPeakRows.length"><td colspan="7" class="cte-no-data">No marker peaks found for the selected candidate.</td></tr>
               <tr v-for="(row, i) in paginatedMarkerPeakRows" :key="(currentPage - 1) * PAGE_SIZE + i">
@@ -450,7 +520,7 @@ const baseUrl = import.meta.env.BASE_URL;
 import { computed, onBeforeUnmount, onDeactivated, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 const router = useRouter();
-import { Download } from "@element-plus/icons-vue";
+import HelpTooltip from "@/components/analysis/AnalysisHelpTooltip.vue";
 import {
   fetchAllDatasets,
   fetchSequencePeak2GeneEvidence,
@@ -516,17 +586,17 @@ type SequenceResultTab = "p2g" | "allPeaks" | "markerPeaks" | "blastHits";
 const activeTab = ref<SequenceResultTab>("blastHits");
 const resultTabs = computed(() => {
   const requestedContent = lastRunRequest.value?.resultContent ?? resultContent.value;
-  const tabs: Array<{ key: SequenceResultTab; label: string }> = [
-    { key: "blastHits", label: "Mapped genomic regions" },
+  const tabs: Array<{ key: SequenceResultTab; label: string; help: string }> = [
+    { key: "blastHits", label: "Mapped genomic regions", help: "Shows the hg38 regions found by BLAST. Select a row to use that region for the other result tabs." },
   ];
   if (requestedContent === "all") {
-    tabs.push({ key: "allPeaks", label: "All overlapping peaks" });
+    tabs.push({ key: "allPeaks", label: "All overlapping peaks", help: "This is the combined view of the Peak-to-gene links and Marker peaks tables. Peaks with the same hg38 coordinates are merged into one row. Their dataset IDs and linked genes are combined; FDR shows the smallest available value and Link score shows the largest. Source shows P2G, Marker, or Both." });
   }
   if (requestedContent === "all" || requestedContent === "peak_to_gene") {
-    tabs.push({ key: "p2g", label: "Peak-to-gene links" });
+    tabs.push({ key: "p2g", label: "Peak-to-gene links", help: "Shows the individual OSCAR P2G links whose peaks overlap the selected mapped region. These peak coordinates are included in All overlapping peaks." });
   }
   if (requestedContent === "all" || requestedContent === "marker_peaks") {
-    tabs.push({ key: "markerPeaks", label: "Marker peaks" });
+    tabs.push({ key: "markerPeaks", label: "Marker peaks", help: "Shows the individual integration-domain marker peaks that overlap the selected mapped region. These peak coordinates are included in All overlapping peaks." });
   }
   return tabs;
 });
@@ -1088,7 +1158,7 @@ onDeactivated(() => {
 .spg-tab-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(251,252,251,0.85); z-index: 4; border-radius: 12px; color: var(--brand-primary-3); font-size: 14px; font-weight: 900; }
 .btn-spinner.dark { border-color: rgba(95,125,112,0.22); border-top-color: var(--brand-primary-3); }
 .spg-detail-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
-.spg-detail-card { display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 12px 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); text-align: center; min-height: 64px; }
+.spg-detail-card { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 12px 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); text-align: center; min-height: 64px; }
 .spg-detail-val { font-size: 14px; font-weight: 900; color: var(--text); word-break: break-all; }
 .spg-detail-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
 .spg-top-actions { margin-top: 10px; display: flex; gap: 8px; }
@@ -1102,7 +1172,8 @@ onDeactivated(() => {
 
 .cte-card { box-sizing: border-box; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow-card); }
 .cte-card-title { font-size: 15px; font-weight: 900; margin: 0 0 12px; color: var(--text); }
-.cte-max-badge { display: inline-flex; align-items: center; min-height: 20px; margin-left: 6px; padding: 1px 8px; border: 1px solid rgba(95,125,112,0.24); border-radius: 999px; background: rgba(143,165,156,0.10); color: var(--brand-primary-3); font-size: 10px; font-weight: 900; letter-spacing: 0.02em; vertical-align: middle; }
+.spg-max-help-wrap { position: relative; display: inline-flex; margin-left: 6px; vertical-align: middle; }
+.cte-max-badge { display: inline-flex; align-items: center; min-height: 20px; padding: 1px 8px; border: 1px solid rgba(95,125,112,0.24); border-radius: 999px; background: rgba(143,165,156,0.10); color: var(--brand-primary-3); font-size: 10px; font-weight: 900; letter-spacing: 0.02em; vertical-align: middle; }
 .cte-settings-card { position: relative; }
 .spg-builder-card .cte-settings-card { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
 .cte-settings-card .cte-card-title { padding-right: 150px; }
@@ -1148,12 +1219,12 @@ onDeactivated(() => {
 .spg-side-column .cte-how-card { flex: 1 1 auto; min-height: 0; height: auto; display: flex; flex-direction: column; padding: 16px 18px; }
 .spg-side-column .how-steps { flex: 1 1 auto; min-height: 0; justify-content: space-evenly; }
 .spg-side-column .how-step { flex: 0 0 auto; }
-.cte-summary-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 16px 10px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-card); text-align: center; }
+.cte-summary-card { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 16px 10px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-card); text-align: center; }
 .sum-num { font-size: 22px; font-weight: 900; color: var(--text); }
 .sum-label { font-size: 11px; font-weight: 800; color: var(--muted); }
 .cte-tabs-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
 .cte-tabs { display: flex; gap: 4px; }
-.cte-tab { min-height: 34px; padding: 8px 16px; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13px; font-weight: 800; cursor: pointer; transition: color 0.18s ease, border-color 0.18s ease; }
+.cte-tab { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 34px; padding: 8px 16px; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13px; font-weight: 800; cursor: pointer; transition: color 0.18s ease, border-color 0.18s ease; }
 .cte-tab:hover { color: var(--text); }
 .cte-tab.active { color: var(--text); border-bottom-color: var(--brand-primary-3); font-weight: 900; }
 
@@ -1203,6 +1274,7 @@ onDeactivated(() => {
 .cte-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 11px; background: var(--surface); }
 .cte-table { width: 100%; border-collapse: collapse; font-size: 14px; color: var(--el-text-color-regular, #606266); }
 .cte-table th { padding: 10px 12px; text-align: center; vertical-align: middle; border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--surface-2); font-weight: 600; color: var(--el-text-color-secondary, #909399); font-size: 14px; }
+.spg-th-label { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
 .cte-table td { padding: 10px 12px; text-align: center; vertical-align: middle; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .cte-table tbody tr:last-child td { border-bottom: none; }
 .spg-candidate-table tbody tr { transition: background 0.16s ease, box-shadow 0.16s ease; }
@@ -1265,12 +1337,13 @@ onDeactivated(() => {
 .cte-ref-chip-x:hover { background: var(--surface-3); color: var(--text); }
 
 
-.spg-upload-wrap { position: relative; display: inline-flex; }
+.spg-upload-wrap, .spg-button-help-wrap { position: relative; display: inline-flex; }
+.spg-result-download-wrap { margin: 0 6px 7px 12px; }
 .spg-help-icon { position: absolute; top: -6px; right: -6px; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 999px; border: 1px solid var(--border-brand); background: var(--surface); color: var(--brand-primary-3); font-size: 9px; font-weight: 900; cursor: help; z-index: 1; }
 .spg-qc-help { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; border: 1px solid var(--border-brand); background: var(--surface); color: var(--brand-primary-3); font-size: 9px; font-weight: 900; cursor: help; z-index: 1; }
 .gsc-sort-th { cursor: pointer; user-select: none; }
 .gsc-sort-th:hover { color: var(--brand-primary-3); }
-.gsc-sort-arrow { font-size: 10px; margin-left: 2px; }
+.gsc-sort-arrow { font-size: 10px; margin-left: 4px; }
 
 /* marker peak badge in P2G table */
 .spg-peak-col {

@@ -174,6 +174,7 @@ export interface RegulatoryAnnotationRecord {
   varQrna?: number;
   varQatac?: number;
   signalType?: string;
+  abcSupport?: number;
   distance?: number;
   regionType?: RegulatoryAnnotationRegionType | string;
   regulatoryRegion?: string;
@@ -567,6 +568,7 @@ type RegulatoryAnnotationRawRecord = Partial<Omit<RegulatoryAnnotationRecord, "i
   linked_gene?: string;
   link_score?: number | string | null;
   link_fdr?: number | string | null;
+  abc_support?: number | string | null;
   distance_to_tss?: number | string | null;
   region_type?: string;
   regulatory_region?: string;
@@ -906,6 +908,7 @@ export function normalizeRegulatoryAnnotationRecord(
     linkFdr: firstNumber(raw, ["linkFdr", "link_fdr"]),
     varQrna: firstNumber(raw, ["varQrna", "var_qrna", "varQRna"]),
     varQatac: firstNumber(raw, ["varQatac", "var_qatac", "varQatac"]),
+    abcSupport: firstNumber(raw, ["abcSupport", "abc_support"]),
     distance: firstNumber(raw, ["distance", "distanceToTss", "distance_to_tss"]),
     regionType,
     regulatoryRegion,

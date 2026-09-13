@@ -228,6 +228,7 @@ public interface RegulatoryAnnotationMapper {
                 mlr.gene_mean_diff AS geneMeanDiff,
                 CAST(NULL AS CHAR) AS markerGeneSourceFile,
                 NULLIF(TRIM(mlr.signal_type), '') AS signalType,
+                mlr.abc_support AS abcSupport,
                 NULLIF(TRIM(mlr.peak_name), '') AS peakName,
                 NULLIF(TRIM(mlr.peak_region), '') AS peakRegion,
                 NULLIF(TRIM(mlr.peak_chromosome), '') AS peakChromosome,
@@ -565,7 +566,7 @@ public interface RegulatoryAnnotationMapper {
             "  AND mp.fdr IS NOT NULL AND mp.fdr &lt;= #{maxFdr}",
             "</if>",
             "<if test='minLog2fc != null'>",
-            "  AND mp.log2fc IS NOT NULL AND ABS(mp.log2fc) &gt;= #{minLog2fc}",
+            "  AND mp.log2fc IS NOT NULL AND mp.log2fc &gt;= #{minLog2fc}",
             "</if>",
             "</script>"
     })
@@ -627,7 +628,7 @@ public interface RegulatoryAnnotationMapper {
             "  AND mp.fdr IS NOT NULL AND mp.fdr &lt;= #{maxFdr}",
             "</if>",
             "<if test='minLog2fc != null'>",
-            "  AND mp.log2fc IS NOT NULL AND ABS(mp.log2fc) &gt;= #{minLog2fc}",
+            "  AND mp.log2fc IS NOT NULL AND mp.log2fc &gt;= #{minLog2fc}",
             "</if>",
             "<choose>",
             "  <when test='orderBy != null'>ORDER BY ${orderBy}</when>",
@@ -717,7 +718,7 @@ public interface RegulatoryAnnotationMapper {
             "  AND mp.fdr IS NOT NULL AND mp.fdr &lt;= #{maxFdr}",
             "</if>",
             "<if test='minLog2fc != null'>",
-            "  AND mp.log2fc IS NOT NULL AND ABS(mp.log2fc) &gt;= #{minLog2fc}",
+            "  AND mp.log2fc IS NOT NULL AND mp.log2fc &gt;= #{minLog2fc}",
             "</if>",
             "<choose>",
             "  <when test='peakChromosome != null and peakStart != null and peakEnd != null'>",
@@ -786,7 +787,7 @@ public interface RegulatoryAnnotationMapper {
             "  AND mp.fdr IS NOT NULL AND mp.fdr &lt;= #{maxFdr}",
             "</if>",
             "<if test='minLog2fc != null'>",
-            "  AND mp.log2fc IS NOT NULL AND ABS(mp.log2fc) &gt;= #{minLog2fc}",
+            "  AND mp.log2fc IS NOT NULL AND mp.log2fc &gt;= #{minLog2fc}",
             "</if>",
             "</script>"
     })
@@ -831,7 +832,7 @@ public interface RegulatoryAnnotationMapper {
             "  AND mp.fdr IS NOT NULL AND mp.fdr &lt;= #{maxFdr}",
             "</if>",
             "<if test='minLog2fc != null'>",
-            "  AND mp.log2fc IS NOT NULL AND ABS(mp.log2fc) &gt;= #{minLog2fc}",
+            "  AND mp.log2fc IS NOT NULL AND mp.log2fc &gt;= #{minLog2fc}",
             "</if>",
             "<choose>",
             "  <when test='orderBy != null'>ORDER BY ${orderBy}</when>",
@@ -1432,6 +1433,7 @@ public interface RegulatoryAnnotationMapper {
             + "  NULL AS geneMeanDiff, "
             + "  NULL AS markerGeneSourceFile, "
             + "  NULL AS signalType, "
+            + "  p.abc_support AS abcSupport, "
             + "  p.peak_name AS peakName, "
             + "  p.chromosome AS peakChromosome, "
             + "  p.peak_start AS peakStart, "
@@ -1465,6 +1467,7 @@ public interface RegulatoryAnnotationMapper {
             "  p.gene_name AS geneSymbol, NULL AS geneId, NULL AS geneChromosome,",
             "  NULL AS geneStart, NULL AS geneEnd, NULL AS strand, NULL AS avgLog2fc,",
             "  NULL AS geneFdr, NULL AS geneMeanDiff, NULL AS markerGeneSourceFile, NULL AS signalType,",
+            "  p.abc_support AS abcSupport,",
             "  p.peak_name AS peakName, CONCAT(TRIM(p.chromosome), ':', p.peak_start, '-', p.peak_end) AS peakRegion,",
             "  p.chromosome AS peakChromosome, p.peak_start AS peakStart, p.peak_end AS peakEnd,",
             "  NULL AS peakLog2fc, NULL AS peakFdr, NULL AS peakMeanDiff, NULL AS markerPeakSourceFile,",

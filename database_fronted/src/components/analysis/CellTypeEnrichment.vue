@@ -8,7 +8,17 @@
     <div class="cte-workbench">
       <div class="cte-card cte-builder-card">
         <section class="cte-builder-section">
-          <div class="cte-card-title">Gene set input <span class="cte-max-badge">MAX input: 200 genes</span></div>
+          <div class="cte-card-title">
+            <span>Gene set input
+              <span class="cte-max-help-wrap">
+                <span class="cte-max-badge">MAX input: 200 genes</span>
+                <el-tooltip placement="top" effect="light" :show-after="200">
+                  <template #content><div class="cte-result-level-help">Enter human gene symbols separated by line breaks, commas, or spaces. Symbols are normalised to uppercase, duplicates are removed, and at most 200 genes are accepted.</div></template>
+                  <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Gene set input help">?</span>
+                </el-tooltip>
+              </span>
+            </span>
+          </div>
 
       <div
         v-if="displayedInputError"
@@ -42,7 +52,7 @@ CCR7"
       </p>
 
       <div class="cte-btn-row">
-        <span class="spg-upload-wrap">
+        <span class="cte-button-help-wrap">
           <button type="button" class="soft-btn" :disabled="loading" @click="uploadFile">
             <span>📎</span> Upload file
           </button>
@@ -50,28 +60,52 @@ CCR7"
             <template #content>
               <div><div>Accepted files: .txt, .csv, and .tsv.</div><div>The parser reads a recognised gene column when one is present; otherwise it reads gene symbols from the text cells. Duplicate symbols are removed.</div></div>
             </template>
-            <span class="spg-help-icon">?</span>
+            <span class="cte-button-help-icon" role="button" tabindex="0" aria-label="Upload file help">?</span>
           </el-tooltip>
         </span>
-        <button type="button" class="soft-btn" :disabled="loading" @click="loadExample">
-          <span>📋</span> Load example
-        </button>
-        <button type="button" class="soft-btn" :disabled="loading" @click="clearInput">
-          <span>✕</span> Clear
-        </button>
+        <span class="cte-button-help-wrap">
+          <button type="button" class="soft-btn" :disabled="loading" @click="loadExample">
+            <span>📋</span> Load example
+          </button>
+          <el-tooltip placement="top" effect="light" :show-after="200">
+            <template #content><div class="cte-result-level-help">Loads a 20-gene cardiomyocyte example and selects its Heart reference dataset when that dataset is available.</div></template>
+            <span class="cte-button-help-icon" role="button" tabindex="0" aria-label="Load example help">?</span>
+          </el-tooltip>
+        </span>
+        <span class="cte-button-help-wrap">
+          <button type="button" class="soft-btn" :disabled="loading" @click="clearInput">
+            <span>✕</span> Clear
+          </button>
+          <el-tooltip placement="top" effect="light" :show-after="200">
+            <template #content><div class="cte-result-level-help">Removes every gene from the input box. Existing results are cleared because they no longer match the current input.</div></template>
+            <span class="cte-button-help-icon" role="button" tabindex="0" aria-label="Clear input help">?</span>
+          </el-tooltip>
+        </span>
       </div>
 
       <div class="cte-gene-stats">
         <div class="stat-item stat-item--muted">
           <span class="stat-label">Input genes</span>
+            <el-tooltip placement="top" effect="light" :show-after="200">
+              <template #content><div class="cte-result-level-help">Number of valid, unique gene symbols currently parsed from the input. This value updates before the analysis runs.</div></template>
+              <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Input genes help">?</span>
+            </el-tooltip>
           <span class="stat-value">{{ inputGeneCount }}</span>
         </div>
         <div class="stat-item">
           <span class="stat-label">Matched genes</span>
+            <el-tooltip placement="top" effect="light" :show-after="200">
+              <template #content><div class="cte-result-level-help">Input genes found in the marker-gene universe of the selected OSCAR dataset. A dash is shown until an analysis has completed.</div></template>
+              <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Matched genes help">?</span>
+            </el-tooltip>
           <span class="stat-value">{{ matchedGeneCount }}</span>
         </div>
         <div class="stat-item stat-item--bad">
           <span class="stat-label">Unmatched genes</span>
+            <el-tooltip placement="top" effect="light" :show-after="200">
+              <template #content><div class="cte-result-level-help">Valid input genes not found in the selected dataset's marker-gene universe. A dash means the analysis has not run or no unmatched genes were found.</div></template>
+              <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Unmatched genes help">?</span>
+            </el-tooltip>
           <span class="stat-value stat-value--muted">{{ unmatchedGeneCount }}</span>
         </div>
       </div>
@@ -86,7 +120,13 @@ CCR7"
             <div class="cte-fields">
               <!-- 1. Tissue -->
               <label class="cte-field">
-                <span class="cte-field-label">Tissue <em>required</em></span>
+                <span class="cte-field-label cte-field-label--help">
+                  <span>Tissue <em>required</em></span>
+                  <el-tooltip placement="top" effect="light" :show-after="200">
+                    <template #content><div class="cte-result-level-help">Selects the biological tissue and limits the Dataset list to OSCAR samples available for cell-type enrichment in that tissue.</div></template>
+                    <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Tissue help">?</span>
+                  </el-tooltip>
+                </span>
                 <el-select
                   v-model="tissue"
                   class="cte-select"
@@ -103,7 +143,13 @@ CCR7"
 
               <!-- 2. Dataset -->
               <label class="cte-field">
-                <span class="cte-field-label">Dataset <em>required</em></span>
+                <span class="cte-field-label cte-field-label--help">
+                  <span>Dataset <em>required</em></span>
+                  <el-tooltip placement="top" effect="light" :show-after="200">
+                    <template #content><div class="cte-result-level-help">Chooses the single OSCAR dataset whose integration expression marker genes define both the tested groups and the background universe.</div></template>
+                    <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Dataset help">?</span>
+                  </el-tooltip>
+                </span>
                 <el-select
                   v-model="referenceDatasetId"
                   class="cte-select"
@@ -165,19 +211,27 @@ CCR7"
 
           <!-- Advanced (right sub-column) -->
           <div class="cte-settings-advanced-col">
-            <button
-              type="button"
-              class="cte-advanced-toggle"
-              :class="{ open: advancedOpen }"
-              @click="advancedOpen = !advancedOpen"
-            >
-              <span class="cte-toggle-chev">▸</span>
-              Advanced settings
-            </button>
+            <span class="cte-advanced-toggle-wrap">
+              <button
+                type="button"
+                class="cte-advanced-toggle"
+                :class="{ open: advancedOpen }"
+                @click="advancedOpen = !advancedOpen"
+              >
+                <span class="cte-toggle-chev">▸</span>
+                Advanced settings
+              </button>
+            </span>
 
             <div v-show="advancedOpen" class="cte-advanced">
               <label class="cte-field">
-                <span class="cte-field-label">Marker reference</span>
+                <span class="cte-field-label cte-field-label--help">
+                  <span>Marker reference</span>
+                  <el-tooltip placement="top" effect="light" :show-after="200">
+                    <template #content><div class="cte-result-level-help">Uses integration-domain gene-expression markers from the selected dataset as the reference. Gene activity score markers are not mixed into this analysis.</div></template>
+                    <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Marker reference help">?</span>
+                  </el-tooltip>
+                </span>
                 <el-select
                   v-model="markerReference"
                   class="cte-select"
@@ -190,7 +244,13 @@ CCR7"
               </label>
 
               <label class="cte-field">
-                <span class="cte-field-label">Minimum overlap</span>
+                <span class="cte-field-label cte-field-label--help">
+                  <span>Minimum overlap</span>
+                  <el-tooltip placement="top" effect="light" :show-after="200">
+                    <template #content><div class="cte-result-level-help">Minimum number of matched input genes that a cell type or cluster must share with its marker set to be included in the returned results.</div></template>
+                    <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Minimum overlap help">?</span>
+                  </el-tooltip>
+                </span>
                 <el-input-number
                   v-model="minOverlap"
                   class="cte-number"
@@ -202,7 +262,13 @@ CCR7"
               </label>
 
               <label class="cte-field">
-                <span class="cte-field-label">FDR method</span>
+                <span class="cte-field-label cte-field-label--help">
+                  <span>FDR method</span>
+                  <el-tooltip placement="top" effect="light" :show-after="200">
+                    <template #content><div class="cte-result-level-help">Benjamini-Hochberg correction is applied across all tested marker sets in the selected dataset. Results with FDR ≤ 0.05 are counted as significant.</div></template>
+                    <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="FDR method help">?</span>
+                  </el-tooltip>
+                </span>
                 <el-select
                   v-model="fdrMethod"
                   class="cte-select"
@@ -218,18 +284,28 @@ CCR7"
         </div>
 
         <div class="cte-card-actions">
-          <button
-            type="button"
-            class="primary-btn"
-            :disabled="loading || parsedGenes.length === 0 || geneLimitExceeded || !tissue || !referenceDatasetId"
-            @click="runAnalysis"
-          >
-            <span v-if="loading" class="btn-spinner"></span>
-            {{ loading ? "Running…" : "Run enrichment" }}
-          </button>
-          <button type="button" class="soft-btn" :disabled="loading" @click="resetAll">
-            Reset
-          </button>
+          <span class="cte-button-help-wrap">
+            <button
+              type="button"
+              class="primary-btn"
+              :disabled="loading || parsedGenes.length === 0 || geneLimitExceeded || !tissue || !referenceDatasetId"
+              @click="runAnalysis"
+            >
+              <span v-if="loading" class="btn-spinner"></span>
+              {{ loading ? "Running…" : "Run enrichment" }}
+            </button>
+            <el-tooltip placement="top" effect="light" :show-after="200">
+              <template #content><div class="cte-result-level-help">Runs a hypergeometric enrichment test for the selected result level, then applies BH multiple-testing correction and ranks the returned groups by FDR.</div></template>
+              <span class="cte-button-help-icon" role="button" tabindex="0" aria-label="Run enrichment help">?</span>
+            </el-tooltip>
+          </span>
+          <span class="cte-button-help-wrap">
+            <button type="button" class="soft-btn" :disabled="loading" @click="resetAll">Reset</button>
+            <el-tooltip placement="top" effect="light" :show-after="200">
+              <template #content><div class="cte-result-level-help">Restores all inputs and settings to their defaults and removes the current enrichment results.</div></template>
+              <span class="cte-button-help-icon" role="button" tabindex="0" aria-label="Reset analysis help">?</span>
+            </el-tooltip>
+          </span>
         </div>
 
         <div v-if="loading" class="cte-progress-card" role="status" aria-live="polite">
@@ -309,18 +385,34 @@ CCR7"
         <div class="cte-summary-card">
           <span class="sum-num">{{ enrichmentResults.inputGenes?.length ?? 0 }}</span>
           <span class="sum-label">Input genes</span>
+            <el-tooltip placement="top" effect="light" :show-after="200">
+              <template #content><div class="cte-result-level-help">Number of valid, unique gene symbols submitted in this completed analysis.</div></template>
+              <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Result input genes help">?</span>
+            </el-tooltip>
         </div>
         <div class="cte-summary-card">
           <span class="sum-num">{{ enrichmentResults.matchedGenes?.length ?? 0 }}</span>
           <span class="sum-label">Matched genes</span>
+            <el-tooltip placement="top" effect="light" :show-after="200">
+              <template #content><div class="cte-result-level-help">Number of submitted genes found in at least one integration expression marker set in the selected dataset.</div></template>
+              <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Result matched genes help">?</span>
+            </el-tooltip>
         </div>
         <div class="cte-summary-card">
           <span class="sum-num">{{ enrichmentResults.significantResults ?? 0 }}</span>
           <span class="sum-label">Significant results</span>
+            <el-tooltip placement="top" effect="light" :show-after="200">
+              <template #content><div class="cte-result-level-help">Number of returned cell types or clusters with Benjamini-Hochberg adjusted FDR ≤ 0.05.</div></template>
+              <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Significant results help">?</span>
+            </el-tooltip>
         </div>
         <div class="cte-summary-card">
           <span class="sum-num sum-num--sm">{{ topEnrichedLabel }}</span>
           <span class="sum-label">{{ topEnrichedSummaryLabel }}</span>
+            <el-tooltip placement="top" effect="light" :show-after="200">
+              <template #content><div class="cte-result-level-help">Highest-ranked returned group after sorting by FDR, then P value, enrichment fold, and overlap. It is not selected by gene count alone.</div></template>
+              <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Top enriched result help">?</span>
+            </el-tooltip>
         </div>
       </div>
 
@@ -333,17 +425,31 @@ CCR7"
       </div>
 
       <!-- Result tabs -->
-      <div class="cte-tabs">
-        <button
-          v-for="tab in resultTabs"
-          :key="tab.key"
-          type="button"
-          class="cte-tab"
-          :class="{ active: resultTab === tab.key }"
-          @click="resultTab = tab.key"
-        >
-          {{ tab.label }}
-        </button>
+      <div class="cte-tabs-row">
+        <div class="cte-tabs">
+          <button
+            v-for="tab in resultTabs"
+            :key="tab.key"
+            type="button"
+            class="cte-tab"
+            :class="{ active: resultTab === tab.key }"
+            @click="resultTab = tab.key"
+          >
+            <span class="cte-tab-label">
+              <span>{{ tab.label }}</span>
+              <HelpTooltip :text="tab.help" :label="`${tab.label} help`" />
+            </span>
+          </button>
+        </div>
+        <span class="cte-button-help-wrap cte-result-download-wrap">
+          <button type="button" class="soft-btn" :disabled="resultRows.length === 0" @click="downloadActiveResult">
+            <span>⇩</span> Download
+          </button>
+          <el-tooltip placement="top" effect="light" :show-after="200">
+            <template #content><div class="cte-result-level-help">{{ activeResultDownloadHelp }}</div></template>
+            <span class="cte-button-help-icon" role="button" tabindex="0" aria-label="Download current result help">?</span>
+          </el-tooltip>
+        </span>
       </div>
 
       <!-- Tab content -->
@@ -351,7 +457,10 @@ CCR7"
         <template v-if="resultTab === 'overview'">
           <div class="cte-overview-grid">
             <div class="cte-overview-panel">
-              <div class="cte-chart-title">{{ overviewTitle }}</div>
+              <div class="cte-chart-title cte-chart-title--help">
+                <span>{{ overviewTitle }}</span>
+                <HelpTooltip text="Shows up to the top 8 results ranked by FDR, with the lowest FDR first. Bar values are −log10(FDR), so a larger value and longer bar indicate stronger enrichment significance." :label="`${overviewTitle} help`" />
+              </div>
               <div v-if="topOverviewRows.length === 0" class="cte-empty-state">No enrichment results found.</div>
               <div v-else class="cte-bar-list">
                 <button
@@ -404,14 +513,14 @@ CCR7"
             <table class="cte-table">
               <thead>
                 <tr>
-                  <th>Rank</th>
-                  <th class="gsc-sort-th" @click="toggleSort(primaryResultSortColumn)">{{ primaryResultColumnLabel }} <span class="gsc-sort-arrow">{{ sortArrow(primaryResultSortColumn) }}</span></th>
-                  <th class="gsc-sort-th" @click="toggleSort('overlap')">Overlap <span class="gsc-sort-arrow">{{ sortArrow('overlap') }}</span></th>
-                  <th>Overlap genes</th>
-                  <th class="gsc-sort-th" @click="toggleSort('enrichmentFold')">Enrichment fold <span class="gsc-sort-arrow">{{ sortArrow('enrichmentFold') }}</span></th>
-                  <th class="gsc-sort-th" @click="toggleSort('pValue')">P value <span class="gsc-sort-arrow">{{ sortArrow('pValue') }}</span></th>
-                  <th class="gsc-sort-th" @click="toggleSort('fdr')">FDR <span class="gsc-sort-arrow">{{ sortArrow('fdr') }}</span></th>
-                  <th class="gsc-sort-th" @click="toggleSort('datasetCount')">Dataset count <span class="gsc-sort-arrow">{{ sortArrow('datasetCount') }}</span></th>
+                  <th><span class="cte-th-label"><span>Rank</span><HelpTooltip text="Position of this result after enrichment results are ranked." label="Rank column help" /></span></th>
+                  <th class="gsc-sort-th" @click="toggleSort(primaryResultSortColumn)"><span class="cte-th-label"><span>{{ primaryResultColumnLabel }}</span><HelpTooltip text="The enriched cell type or dataset cluster represented by this row." :label="`${primaryResultColumnLabel} column help`" /><span class="gsc-sort-arrow">{{ sortArrow(primaryResultSortColumn) }}</span></span></th>
+                  <th class="gsc-sort-th" @click="toggleSort('overlap')"><span class="cte-th-label"><span>Overlap</span><HelpTooltip text="Number of input genes found in this group's OSCAR marker-gene set." label="Overlap column help" /><span class="gsc-sort-arrow">{{ sortArrow('overlap') }}</span></span></th>
+                  <th><span class="cte-th-label"><span>Overlap genes</span><HelpTooltip text="Input gene symbols shared with this group's OSCAR marker-gene set." label="Overlap genes column help" /></span></th>
+                  <th class="gsc-sort-th" @click="toggleSort('enrichmentFold')"><span class="cte-th-label"><span>Enrichment fold</span><HelpTooltip text="Observed gene overlap divided by the overlap expected by chance. Values above 1 indicate enrichment." label="Enrichment fold column help" /><span class="gsc-sort-arrow">{{ sortArrow('enrichmentFold') }}</span></span></th>
+                  <th class="gsc-sort-th" @click="toggleSort('pValue')"><span class="cte-th-label"><span>P value</span><HelpTooltip text="Hypergeometric-test P value before multiple-testing correction." label="P value column help" /><span class="gsc-sort-arrow">{{ sortArrow('pValue') }}</span></span></th>
+                  <th class="gsc-sort-th" @click="toggleSort('fdr')"><span class="cte-th-label"><span>FDR</span><HelpTooltip text="P value adjusted with the Benjamini-Hochberg method. Smaller values indicate stronger evidence." label="FDR column help" /><span class="gsc-sort-arrow">{{ sortArrow('fdr') }}</span></span></th>
+                  <th class="gsc-sort-th" @click="toggleSort('datasetCount')"><span class="cte-th-label"><span>Dataset count</span><HelpTooltip text="Number of OSCAR datasets contributing to this returned group." label="Dataset count column help" /><span class="gsc-sort-arrow">{{ sortArrow('datasetCount') }}</span></span></th>
                 </tr>
               </thead>
               <tbody>
@@ -457,6 +566,15 @@ CCR7"
 
       </div>
     </div>
+
+    <ChartImageDownloadDialog
+      v-model="bubbleDownloadDialogOpen"
+      title="Download enrichment bubble plot"
+      :chart-label="bubbleDownloadLabel"
+      :include-pdf="true"
+      :download="downloadBubbleChart"
+      :download-pdf="downloadBubblePdf"
+    />
 
     <!-- Hidden file input -->
     <input
@@ -520,6 +638,8 @@ import { computed, nextTick, onMounted, onBeforeUnmount, onDeactivated, ref, wat
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import * as echarts from "echarts";
+import ChartImageDownloadDialog from "@/components/ChartImageDownloadDialog.vue";
+import HelpTooltip from "@/components/analysis/AnalysisHelpTooltip.vue";
 import type {
   CellTypeEnrichmentDatasetOption,
   CellTypeEnrichmentResponse,
@@ -530,6 +650,8 @@ import {
   fetchCellTypeEnrichmentTissues,
   runCellTypeEnrichment,
 } from "@/api/analysis";
+import { downloadChart, downloadChartPdf } from "@/utils/downloadChart";
+import { downloadCsv } from "@/utils/downloadCsv";
 import { parseFileContent, parseGenes as parseGenesSafe, type ParseResult } from "@/utils/geneParser";
 
 const MAX_ENRICHMENT_GENES = 200;
@@ -670,10 +792,21 @@ const previewFiltered = ref<{ value: string; reason: string }[]>([]);
 const previewWarnings = ref<string[]>([]);
 
 const resultTabs = [
-  { key: "overview", label: "Overview" },
-  { key: "bubble", label: "Bubble" },
-  { key: "table", label: "Results table" },
+  { key: "overview", label: "Overview", help: "Summary of the top enrichment results and input-gene coverage." },
+  { key: "bubble", label: "Bubble", help: "Bubble plot comparing the returned enrichment results." },
+  { key: "table", label: "Results table", help: "Detailed statistics for all returned enrichment results." },
 ];
+const bubbleDownloadDialogOpen = ref(false);
+
+const activeResultDownloadHelp = computed(() => {
+  if (resultTab.value === "bubble") {
+    return "Downloads the currently displayed bubble plot. Choose PNG, PDF, or SVG in the format dialog.";
+  }
+  if (resultTab.value === "table") {
+    return "Downloads every result row in the current table sort order as CSV, not only the visible page.";
+  }
+  return "Downloads the Top enriched overview rows and their enrichment statistics as CSV.";
+});
 
 const progressStageLabel = computed(() => ({
   IDLE: "Ready",
@@ -1022,6 +1155,104 @@ const tableTotalPages = computed(() => pageCount(sortedRows.value.length));
 
 const paginatedEnrichmentRows = computed(() => paginateRows(sortedRows.value, tablePage.value));
 
+const bubbleDownloadLabel = computed(() => {
+  const level = displayedResultLevel.value === "cluster" ? "Cluster" : "Cell type";
+  return `${referenceDatasetId.value || "Selected dataset"} · ${level} · Top ${Math.min(resultRows.value.length, BUBBLE_VISIBLE_LIMIT)}`;
+});
+
+function downloadActiveResult() {
+  if (!resultRows.value.length) return;
+  if (resultTab.value === "bubble") {
+    bubbleDownloadDialogOpen.value = true;
+    return;
+  }
+  if (resultTab.value === "table") {
+    downloadResultsTableCsv();
+    return;
+  }
+  downloadOverviewCsv();
+}
+
+function downloadOverviewCsv() {
+  const rows = topOverviewRows.value.map((row) => enrichmentCsvRow(row));
+  downloadCsv(
+    `${enrichmentDownloadStem()}_overview.csv`,
+    enrichmentCsvHeaders(),
+    rows
+  );
+  ElMessage.success("Overview CSV download started.");
+}
+
+function downloadResultsTableCsv() {
+  const rows = sortedRows.value.map((row) => enrichmentCsvRow(row));
+  downloadCsv(
+    `${enrichmentDownloadStem()}_results_table.csv`,
+    enrichmentCsvHeaders(),
+    rows
+  );
+  ElMessage.success("Results table CSV download started.");
+}
+
+function enrichmentCsvHeaders(): string[] {
+  return [
+    "rank",
+    primaryResultColumnLabel.value,
+    "overlap",
+    "overlapGenes",
+    "enrichmentFold",
+    "pValue",
+    "fdr",
+    "datasetCount",
+  ];
+}
+
+function enrichmentCsvRow(row: EnrichmentResultRow): string[] {
+  return [
+    String(row.rank),
+    resultPrimaryLabel(row),
+    String(row.overlap ?? ""),
+    (row.genes ?? []).join(";"),
+    String(row.enrichmentFold ?? ""),
+    String(row.pValue ?? row.pvalue ?? ""),
+    String(row.fdr ?? ""),
+    String(row.datasetCount ?? ""),
+  ];
+}
+
+function downloadBubbleChart(format: "png" | "svg"): boolean {
+  const started = downloadChart(
+    bubbleChart,
+    `${enrichmentDownloadStem()}_bubble.${format}`,
+    { type: format, pixelRatio: 3, backgroundColor: "#ffffff" }
+  );
+  if (!started) ElMessage.warning("The bubble plot is not ready yet. Please try again.");
+  return started;
+}
+
+function downloadBubblePdf(): boolean {
+  const started = downloadChartPdf(
+    bubbleChart,
+    `${enrichmentDownloadStem()}_bubble.pdf`,
+    { pixelRatio: 3, backgroundColor: "#ffffff" }
+  );
+  if (!started) ElMessage.warning("The bubble plot is not ready yet. Please try again.");
+  return started;
+}
+
+function enrichmentDownloadStem(): string {
+  const parts = [
+    referenceDatasetId.value || "dataset",
+    tissue.value || "tissue",
+    displayedResultLevel.value,
+    "cell_type_enrichment",
+  ];
+  return parts.map(sanitizeFilenamePart).join("_");
+}
+
+function sanitizeFilenamePart(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/^_+|_+$/g, "") || "result";
+}
+
 function setTablePage(page: number) {
   tablePage.value = Math.min(tableTotalPages.value, Math.max(1, page));
   tablePageInput.value = String(tablePage.value);
@@ -1178,6 +1409,7 @@ async function runAnalysis() {
 }
 
 function resetAll() {
+  bubbleDownloadDialogOpen.value = false;
   geneSetText.value = "";
   tissue.value = "";
   referenceDatasetId.value = "";
@@ -1331,6 +1563,7 @@ onMounted(async () => {
 
 onDeactivated(() => {
   previewVisible.value = false;
+  bubbleDownloadDialogOpen.value = false;
 });
 
 onBeforeUnmount(() => {
@@ -1371,9 +1604,11 @@ onBeforeUnmount(() => {
   margin: 0 0 12px;
   color: var(--text);
 }
+
+.cte-max-help-wrap { position: relative; display: inline-flex; margin-left: 10px; vertical-align: middle; }
 .cte-max-badge {
   display: inline-block;
-  margin-left: 10px;
+  margin-left: 0;
   padding: 2px 9px;
   border: 1px solid var(--brand-primary-3);
   border-radius: 6px;
@@ -1509,6 +1744,12 @@ onBeforeUnmount(() => {
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 12px;
+}
+
+.cte-btn-row .soft-btn {
+  min-height: 38px;
+  padding: 8px 16px;
+  border-radius: 11px;
 }
 
 .cte-card-actions {
@@ -1803,6 +2044,7 @@ onBeforeUnmount(() => {
 }
 
 .stat-item {
+  position: relative;
   flex: 1 1 120px;
   display: flex;
   justify-content: space-between;
@@ -1818,6 +2060,12 @@ onBeforeUnmount(() => {
   font-size: 12px;
   font-weight: 800;
   color: var(--muted);
+}
+
+.stat-label--help {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .stat-value {
@@ -1944,10 +2192,14 @@ onBeforeUnmount(() => {
   flex-direction: column;
 }
 
-.cte-advanced-toggle {
+.cte-advanced-toggle-wrap {
   position: absolute;
   top: 16px;
   right: 0;
+  display: inline-flex;
+}
+
+.cte-advanced-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -2068,6 +2320,7 @@ onBeforeUnmount(() => {
 }
 
 .cte-summary-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2103,8 +2356,9 @@ onBeforeUnmount(() => {
 
 .sum-label {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
+  gap: 5px;
   width: 100%;
   min-height: 28px;
   font-size: 11px;
@@ -2127,6 +2381,12 @@ onBeforeUnmount(() => {
   font-size: 14px;
   font-weight: 900;
   margin-bottom: 12px;
+}
+
+.cte-chart-title--help {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .cte-chart-sub {
@@ -2272,13 +2532,27 @@ onBeforeUnmount(() => {
 
 /* ── Tabs ────────────────────────────────────────────────────────── */
 .cte-tabs {
+  flex: 1 1 auto;
   display: flex;
   gap: 4px;
-  margin-bottom: 12px;
   border-bottom: 1px solid var(--border);
 }
 
+.cte-tabs-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.cte-result-download-wrap {
+  flex: 0 0 auto;
+}
+
 .cte-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 34px;
   padding: 8px 16px;
   border: none;
@@ -2290,6 +2564,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   transition: color 0.18s ease, border-color 0.18s ease;
 }
+.cte-tab-label, .cte-th-label { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
 
 .cte-tab:hover {
   color: var(--text);
@@ -2653,11 +2928,27 @@ onBeforeUnmount(() => {
 
   .cte-advanced-toggle {
     position: static;
+  }
+
+  .cte-advanced-toggle-wrap {
+    position: relative;
+    top: auto;
+    right: auto;
+    align-self: flex-start;
     margin-bottom: 10px;
   }
 
   .cte-summary-row {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cte-tabs-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cte-result-download-wrap {
+    align-self: flex-end;
   }
 
   .cte-bar-row {
@@ -2672,9 +2963,12 @@ onBeforeUnmount(() => {
 
 
 
-.spg-upload-wrap { position: relative; display: inline-flex; }
-.spg-help-icon { position: absolute; top: -6px; right: -6px; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 999px; border: 1px solid var(--border-brand); background: var(--surface); color: var(--brand-primary-3); font-size: 9px; font-weight: 900; cursor: help; z-index: 1; }
+.cte-button-help-wrap { position: relative; display: inline-flex; }
+.cte-button-help-icon { position: absolute; top: -6px; right: -6px; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 999px; border: 1px solid var(--border-brand); background: var(--surface); color: var(--brand-primary-3); font-size: 9px; font-weight: 900; line-height: 1; cursor: help; z-index: 1; }
+.cte-card-help-icon { position: absolute; top: -6px; right: -6px; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 999px; border: 1px solid var(--border-brand); background: var(--surface); color: var(--brand-primary-3); font-size: 9px; font-weight: 900; line-height: 1; cursor: help; z-index: 2; }
+.cte-card-help-icon:focus-visible { outline: 2px solid rgba(78, 133, 118,0.3); outline-offset: 2px; }
+.cte-button-help-icon:focus-visible { outline: 2px solid rgba(78, 133, 118, 0.3); outline-offset: 2px; }
 .gsc-sort-th { cursor: pointer; user-select: none; }
 .gsc-sort-th:hover { color: var(--brand-primary-3); }
-.gsc-sort-arrow { font-size: 10px; margin-left: 2px; }
+.gsc-sort-arrow { font-size: 10px; margin-left: 4px; }
 </style>

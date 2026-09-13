@@ -12,7 +12,7 @@ import * as echarts from "echarts";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { SearchResultColorBy, SearchResultEmbedding, UmapData, UmapPoint } from "@/api/searchResult";
 import { getBioChartColor, getBioChartColorMap } from "@/utils/chartPalette";
-import { downloadChart, type ChartDownloadOptions } from "@/utils/downloadChart";
+import { downloadChart, downloadChartPdf, type ChartDownloadOptions } from "@/utils/downloadChart";
 
 const props = defineProps<{
   data: UmapData | null;
@@ -140,7 +140,11 @@ function downloadImage(filename: string, options?: ChartDownloadOptions) {
   return downloadChart(chart, filename, options);
 }
 
-defineExpose({ downloadImage });
+function downloadPdf(filename: string, options?: Omit<ChartDownloadOptions, "type">) {
+  return downloadChartPdf(chart, filename, options);
+}
+
+defineExpose({ downloadImage, downloadPdf });
 
 watch(() => [props.data, props.loading, props.error, props.embedding, props.colorBy], renderChart, { flush: "post" });
 onMounted(renderChart);

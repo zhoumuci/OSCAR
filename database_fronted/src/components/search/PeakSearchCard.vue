@@ -12,7 +12,10 @@
         </div>
         <span class="cte-query-label">
           <span class="cte-field-label">Region query</span>
-          <span class="cte-max-badge">MAX input: 200 regions</span>
+          <span class="search-max-help-wrap">
+            <span class="cte-max-badge">MAX input: 200 regions</span>
+            <HelpTooltip text="Enter hg38 regions as chr:start-end or as BED-like chromosome, start, and end columns. Each valid line is searched independently, up to 200 regions." label="Region query help" corner />
+          </span>
         </span>
         <textarea v-model="regionInput" class="cte-textarea" :class="{ 'cte-textarea--error': displayedInputError }" rows="3" placeholder="chr3:194136145-194138732" :disabled="loading" @input="onTextareaInput"></textarea>
         <div class="gsc-hint-row">
@@ -39,18 +42,14 @@
               <span class="spg-help-icon">?</span>
             </el-tooltip>
           </span>
-          <button type="button" class="soft-btn" :disabled="loading" @click="loadExample">
-            <span>📋</span> Load example
-          </button>
-          <button type="button" class="soft-btn" :disabled="loading" @click="clearInput">
-            <span>✕</span> Clear
-          </button>
+          <span class="search-action-with-help"><button type="button" class="soft-btn" :disabled="loading" @click="loadExample"><span>📋</span> Load example</button><HelpTooltip text="Replaces the current input with example hg38 regions so the search workflow can be tried immediately." label="Load region example help" corner /></span>
+          <span class="search-action-with-help"><button type="button" class="soft-btn" :disabled="loading" @click="clearInput"><span>✕</span> Clear</button><HelpTooltip text="Removes all regions and input-validation messages while keeping the current search settings." label="Clear region input help" corner /></span>
         </div>
         <input ref="fileInputRef" type="file" accept=".bed,.txt,.csv,.tsv" style="display:none" @change="onBedSelected" />
         <div v-if="regionInput.trim()" class="gsc-stat-row">
-          <div class="gsc-stat gsc-stat--muted"><span class="gsc-stat-num">{{ regionStats.input }}</span><span class="gsc-stat-label">Input regions</span></div>
-          <div class="gsc-stat"><span class="gsc-stat-num">{{ regionStats.valid }}</span><span class="gsc-stat-label">Valid regions</span></div>
-          <div class="gsc-stat" :class="{ 'gsc-stat--bad': regionStats.invalid > 0 }"><span class="gsc-stat-num">{{ regionStats.invalid }}</span><span class="gsc-stat-label">Invalid lines</span></div>
+          <div class="gsc-stat gsc-stat--muted"><HelpTooltip text="Number of non-empty region lines detected in the input." label="Input regions help" corner /><span class="gsc-stat-num">{{ regionStats.input }}</span><span class="gsc-stat-label">Input regions</span></div>
+          <div class="gsc-stat"><HelpTooltip text="Number of regions with an accepted chromosome, start, and end that can be submitted." label="Valid regions help" corner /><span class="gsc-stat-num">{{ regionStats.valid }}</span><span class="gsc-stat-label">Valid regions</span></div>
+          <div class="gsc-stat" :class="{ 'gsc-stat--bad': regionStats.invalid > 0 }"><HelpTooltip text="Number of lines rejected because their coordinates are missing, malformed, or have an invalid interval." label="Invalid region lines help" corner /><span class="gsc-stat-num">{{ regionStats.invalid }}</span><span class="gsc-stat-label">Invalid lines</span></div>
         </div>
         <div class="gsc-filter-row">
           <label class="cte-field">
@@ -67,17 +66,17 @@
               <el-option label="Any input region" value="any" /><el-option label="All input regions" value="all" />
             </el-select>
           </label>
-          <label class="cte-field"><span class="cte-field-label">Per page</span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Per page</span><HelpTooltip text="Controls how many matched samples are shown on each table page. It does not limit the search or CSV download." label="Region results per page help" /></span>
             <el-select v-model="resultSize" class="cte-select" popper-class="oscar-select-popper" :disabled="loading">
               <el-option label="10" :value="10" /><el-option label="20" :value="20" /><el-option label="50" :value="50" />
             </el-select>
           </label>
-          <label class="cte-field"><span class="cte-field-label">Domain</span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Domain</span><HelpTooltip text="Selects the OSCAR data domain in which overlapping marker peaks are searched. The current region-search workflow uses the integrated multi-omic domain." label="Region search domain help" /></span>
             <el-select v-model="domain" class="cte-select" popper-class="oscar-select-popper" :disabled="loading">
               <el-option label="Integration" value="integration" />
             </el-select>
           </label>
-          <label class="cte-field"><span class="cte-field-label">Dataset ID</span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Dataset ID</span><HelpTooltip text="Restricts the overlap search to one OSCAR sample. Enter its identifier in H_000001 format." label="Region dataset ID help" /></span>
             <el-input
               v-model="datasetId"
               class="cte-input"
@@ -88,9 +87,7 @@
           </label>
         </div>
         <div class="gsc-btn-row">
-          <button type="button" class="primary-btn" :disabled="loading || regionStats.valid === 0 || regionLimitExceeded || !datasetId.trim()" @click="doSearch">
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.5"/><line x1="14" y1="14" x2="18" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg> Search
-          </button>
+          <button type="button" class="primary-btn" :disabled="loading || regionStats.valid === 0 || regionLimitExceeded || !datasetId.trim()" @click="doSearch"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.5"/><line x1="14" y1="14" x2="18" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg> Search</button>
           <button type="button" class="soft-btn" :disabled="loading" @click="resetAll">Reset</button>
         </div>
         <div class="gsc-how-brief">
@@ -108,33 +105,26 @@
 
     <div v-if="hasResults" class="gsc-results">
       <div class="gsc-summary-row">
-        <div class="gsc-summary-card"><span class="gsc-sum-num">{{ results.matchedSamples }}</span><span class="gsc-sum-label">Matched samples</span></div>
-        <div class="gsc-summary-card"><span class="gsc-sum-num">{{ results.matchedInputRegions }}/{{ results.inputRegions || '—' }}</span><span class="gsc-sum-label">Matched input regions</span></div>
-        <div class="gsc-summary-card"><span class="gsc-sum-num">{{ results.overlappingPeaks.toLocaleString() }}</span><span class="gsc-sum-label">Overlapping peaks</span></div>
-        <div class="gsc-summary-card"><span class="gsc-sum-num">{{ results.linkedGenes }}</span><span class="gsc-sum-label">Linked marker genes</span></div>
+        <div class="gsc-summary-card"><HelpTooltip text="Number of OSCAR samples returned by the current region query. A Dataset ID restriction normally limits this to the selected sample." label="Matched samples help" corner /><span class="gsc-sum-num">{{ results.matchedSamples }}</span><span class="gsc-sum-label">Matched samples</span></div>
+        <div class="gsc-summary-card"><HelpTooltip text="Number of submitted regions having at least one overlapping marker peak, shown over the total number of valid input regions." label="Matched input regions help" corner /><span class="gsc-sum-num">{{ results.matchedInputRegions }}/{{ results.inputRegions || '—' }}</span><span class="gsc-sum-label">Matched input regions</span></div>
+        <div class="gsc-summary-card"><HelpTooltip text="Total distinct marker-peak overlaps found for the submitted regions in the returned samples." label="Overlapping peaks help" corner /><span class="gsc-sum-num">{{ results.overlappingPeaks.toLocaleString() }}</span><span class="gsc-sum-label">Overlapping peaks</span></div>
+        <div class="gsc-summary-card"><HelpTooltip text="Number of marker genes linked to the overlapping peaks through OSCAR peak-to-gene evidence." label="Linked marker genes help" corner /><span class="gsc-sum-num">{{ results.linkedGenes }}</span><span class="gsc-sum-label">Linked marker genes</span></div>
       </div>
 
       <div class="gsc-res-head">
-        <span class="gsc-res-title">Associated samples</span>
-        <button
-          type="button"
-          class="gsc-dl-btn"
-          title="Download all results as CSV"
-          @click="downloadTableCsv"
-        >
-          <el-icon><Download /></el-icon>
-        </button>
+        <span class="gsc-res-title search-title-with-help"><span>Associated samples</span><HelpTooltip text="One row per returned OSCAR sample, summarising how the submitted regions overlap marker peaks and linked genes." label="Region-search results help" /></span>
+        <button type="button" class="gsc-dl-btn" title="Download all results as CSV" @click="downloadTableCsv"><el-icon><Download /></el-icon><span>Download</span></button>
       </div>
 
       <div class="cte-table-wrap">
         <table class="cte-table"><thead><tr>
-          <th class="gsc-sort-th" @click="toggleSort('sampleId')">Dataset ID <span class="gsc-sort-arrow">{{ sortArrow('sampleId') }}</span></th>
-          <th class="gsc-sort-th" @click="toggleSort('tissue')">Tissue <span class="gsc-sort-arrow">{{ sortArrow('tissue') }}</span></th>
-          <th class="gsc-sort-th" @click="toggleSort('sampleName')">Sample name <span class="gsc-sort-arrow">{{ sortArrow('sampleName') }}</span></th>
-          <th class="gsc-sort-th" @click="toggleSort('matchedRegions')">Matched regions <span class="gsc-sort-arrow">{{ sortArrow('matchedRegions') }}</span></th>
-          <th class="gsc-sort-th" @click="toggleSort('overlappingPeaks')">Overlapping peaks <span class="gsc-sort-arrow">{{ sortArrow('overlappingPeaks') }}</span></th>
-          <th class="gsc-sort-th" @click="toggleSort('linkedGenes')">Linked marker genes <span class="gsc-sort-arrow">{{ sortArrow('linkedGenes') }}</span></th>
-          <th>Data Type</th>
+          <th class="gsc-sort-th" @click="toggleSort('sampleId')"><span class="search-table-header"><span>Dataset ID</span><HelpTooltip text="Unique OSCAR identifier for the matched sample. Select it to open Sample Details." label="Dataset ID column help" /><span class="gsc-sort-arrow">{{ sortArrow('sampleId') }}</span></span></th>
+          <th class="gsc-sort-th" @click="toggleSort('tissue')"><span class="search-table-header"><span>Tissue</span><HelpTooltip text="Tissue label recorded for the matched sample." label="Tissue column help" /><span class="gsc-sort-arrow">{{ sortArrow('tissue') }}</span></span></th>
+          <th class="gsc-sort-th" @click="toggleSort('sampleName')"><span class="search-table-header"><span>Sample name</span><HelpTooltip text="Descriptive sample name supplied in the source metadata." label="Sample name column help" /><span class="gsc-sort-arrow">{{ sortArrow('sampleName') }}</span></span></th>
+          <th class="gsc-sort-th" @click="toggleSort('matchedRegions')"><span class="search-table-header"><span>Matched regions</span><HelpTooltip text="Number of submitted regions that overlap at least one marker peak in this sample, shown against the total valid input regions." label="Matched regions column help" /><span class="gsc-sort-arrow">{{ sortArrow('matchedRegions') }}</span></span></th>
+          <th class="gsc-sort-th" @click="toggleSort('overlappingPeaks')"><span class="search-table-header"><span>Overlapping peaks</span><HelpTooltip text="Number of distinct OSCAR marker peaks overlapping the submitted regions in this sample." label="Overlapping peaks column help" /><span class="gsc-sort-arrow">{{ sortArrow('overlappingPeaks') }}</span></span></th>
+          <th class="gsc-sort-th" @click="toggleSort('linkedGenes')"><span class="search-table-header"><span>Linked marker genes</span><HelpTooltip text="Number of marker genes connected to the overlapping peaks by OSCAR peak-to-gene links." label="Linked marker genes column help" /><span class="gsc-sort-arrow">{{ sortArrow('linkedGenes') }}</span></span></th>
+          <th><span class="search-table-header"><span>Data Type</span><HelpTooltip text="Evidence available for the sample: ATAC indicates marker-peak data and P2G indicates peak-to-gene linkage data." label="Data type column help" /></span></th>
         </tr></thead><tbody>
           <tr v-if="!rows.length"><td colspan="7" class="gsc-empty">No samples found.</td></tr>
           <tr v-for="r in paginatedRows" :key="r.sampleId">
@@ -167,6 +157,7 @@ import { Download } from "@element-plus/icons-vue";
 import { useRouter } from "vue-router";
 import { runPeakSearch } from "@/api/analysis";
 import { downloadCsv } from "@/utils/downloadCsv";
+import HelpTooltip from "@/components/analysis/AnalysisHelpTooltip.vue";
 
 const MAX_REGIONS = 200;
 const EXAMPLE_REGIONS = [
@@ -428,6 +419,7 @@ function downloadTableCsv() {
 .gsc-root { display: flex; flex-direction: column; gap: 14px; }
 .gsc-desc { margin: 0; color: var(--muted); font-size: 14px; font-weight: 750; }
 .gsc-main-card { position: relative; display: flex; flex-direction: column; gap: 12px; min-width: 0; overflow: hidden; }
+.search-max-help-wrap { position: relative; display: inline-flex; }
 .gsc-loading-overlay { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 24px; border-radius: inherit; background: rgba(247, 250, 249, 0.88); backdrop-filter: blur(2px); }
 .gsc-loading-panel { display: flex; min-width: min(320px, 100%); max-width: 460px; flex-direction: column; align-items: center; gap: 10px; padding: 24px 28px; border: 1px solid var(--border-brand); border-radius: 14px; background: rgba(255, 255, 255, 0.96); box-shadow: 0 18px 44px rgba(39, 66, 58, 0.16); text-align: center; }
 .gsc-loading-spinner { width: 34px; height: 34px; box-sizing: border-box; border: 3px solid rgba(95, 125, 112, 0.20); border-top-color: var(--brand-primary-3); border-radius: 50%; animation: gsc-region-spin 0.8s linear infinite; }
@@ -447,16 +439,16 @@ function downloadTableCsv() {
 .gsc-empty { padding: 32px; text-align: center; color: var(--muted); font-size: 14px; }
 .gsc-results { display: flex; flex-direction: column; gap: 12px; }
 .gsc-summary-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-.gsc-summary-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-card); }
+.gsc-summary-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-card); }
 .gsc-sum-num { font-size: 22px; font-weight: 900; color: var(--text); }
 .gsc-sum-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
 .gsc-res-head { display: flex; align-items: center; justify-content: space-between; }
 .gsc-res-title { font-weight: 900; font-size: 14px; }
-.gsc-dl-btn { appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border-brand); border-radius: 999px; background: #fffffff2; color: var(--brand-primary-3); box-shadow: inset 0 1px 0 #ffffffcc, 0 6px 14px #12182614; cursor: pointer; transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, transform 0.18s ease; }
+.gsc-dl-btn { appearance: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 104px; height: 34px; padding: 0 12px; border: 1px solid var(--border-brand); border-radius: 10px; background: #fffffff2; color: var(--brand-primary-3); box-shadow: inset 0 1px 0 #ffffffcc, 0 6px 14px #12182614; cursor: pointer; font-weight: 850; transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, transform 0.18s ease; }
 .gsc-dl-btn:hover { border-color: var(--nav-active-border); background: var(--surface-2); color: var(--text); box-shadow: inset 0 1px 0 #ffffffcc, 0 8px 16px rgba(95,125,112,0.16); transform: translateY(-1px); }
 .gsc-dl-btn :deep(.el-icon) { font-size: 15px; }
 .gsc-stat-row { display: flex; gap: 8px; margin-top: 8px; }
-.gsc-stat { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); text-align: center; }
+.gsc-stat { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); text-align: center; }
 .gsc-stat--muted { background: #f3f4f6; border-color: rgba(160,165,175,0.25); }
 .gsc-stat--bad { background: #fdf0f0; border-color: rgba(200,125,125,0.20); }
 .gsc-stat-num { font-size: 16px; font-weight: 900; color: var(--text); }
@@ -467,6 +459,9 @@ function downloadTableCsv() {
 .cte-field { display: flex; flex-direction: column; gap: 5px; }
 .cte-field-label-row { display: inline-flex; align-items: center; gap: 5px; width: fit-content; }
 .cte-query-label { display: inline-flex; align-items: center; gap: 8px; width: fit-content; }
+.search-title-with-help,
+.search-table-header { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.search-action-with-help { position: relative; display: inline-flex; align-items: stretch; }
 .cte-max-badge { display: inline-flex; align-items: center; min-height: 20px; padding: 1px 8px; border: 1px solid rgba(95,125,112,0.24); border-radius: 999px; background: rgba(143,165,156,0.10); color: var(--brand-primary-3); font-size: 10px; font-weight: 900; letter-spacing: 0.02em; }
 .cte-field-label { font-size: 14px; font-weight: 900; color: rgba(39,66,58,0.84); }
 .gsc-match-help { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 999px; border: 1px solid var(--border-brand); color: var(--brand-primary-3); font-size: 9px; font-weight: 900; cursor: help; }
@@ -480,7 +475,7 @@ function downloadTableCsv() {
 .spg-help-icon { position: absolute; top: -6px; right: -6px; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 999px; border: 1px solid var(--border-brand); background: var(--surface); color: var(--brand-primary-3); font-size: 9px; font-weight: 900; cursor: help; z-index: 1; }
 .gsc-sort-th { cursor: pointer; user-select: none; }
 .gsc-sort-th:hover { color: var(--brand-primary-3); }
-.gsc-sort-arrow { font-size: 10px; margin-left: 2px; }
+.gsc-sort-arrow { flex: 0 0 auto; font-size: 10px; margin-left: 5px; }
 .gsc-parse-stats { font-size: 11px; font-weight: 700; color: var(--brand-primary-3); }
 .cte-select { width: 100%; }
 .cte-input { width: 100%; }
@@ -547,12 +542,18 @@ function downloadTableCsv() {
   .gsc-summary-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .gsc-btn-row > .search-action-with-help > button {
+    width: 100%;
+  }
 }
 
 @media (max-width: 480px) {
   .gsc-res-head { flex-wrap: wrap; gap: 8px; }
   .gsc-summary-row { grid-template-columns: 1fr; }
   .cte-btn-row .soft-btn,
+  .cte-btn-row > .search-action-with-help,
+  .cte-btn-row > .search-action-with-help > button,
   .spg-upload-wrap {
     width: 100%;
   }

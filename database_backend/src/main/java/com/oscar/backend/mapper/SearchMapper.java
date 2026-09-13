@@ -226,6 +226,7 @@ public interface SearchMapper {
 
     /* ── Cell type search ── */
     @Select("""
+            <script>
             SELECT ca.dataset_id, COUNT(DISTINCT ca.cluster_label) AS cluster_count,
                    SUM(COALESCE(ca.cell_count, 0)) AS matched_cell_count,
                    s.sample_name, s.tissue, s.sample_type, s.cell_count,
@@ -236,10 +237,15 @@ public interface SearchMapper {
               AND (s.is_visible IS NULL OR s.is_visible = 1)
             WHERE ca.domain = 'integration'
               AND ca.major_cell_type = #{cellType}
+            <if test='tissue != null'>
+              AND s.tissue = #{tissue}
+            </if>
             GROUP BY ca.dataset_id
             ORDER BY matched_cell_count DESC, ca.dataset_id ASC
+            </script>
             """)
-    List<Map<String, Object>> findSamplesByCellType(@Param("cellType") String cellType);
+    List<Map<String, Object>> findSamplesByCellType(@Param("cellType") String cellType,
+                                                     @Param("tissue") String tissue);
 
     @Select("""
             SELECT DISTINCT NULLIF(ca.major_cell_type, '') AS major_cell_type

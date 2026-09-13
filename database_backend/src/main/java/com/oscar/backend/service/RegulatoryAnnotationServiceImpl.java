@@ -330,11 +330,12 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
             case LINKED_REGION -> {
                 if ("all".equals(p2gMode)) {
                     writeCsvRow(writer,
-                            "Gene", "Linked peak", "P2G score", "FDR", "VarQ RNA", "VarQ ATAC", "Sample");
+                            "Gene", "Linked peak", "P2G score", "FDR", "VarQ RNA", "VarQ ATAC",
+                            "ABC support", "Sample");
                 } else {
                     writeCsvRow(writer,
                             "Gene", contextHeader, "Linked peak", "P2G score", "Gene Diff",
-                            "Peak Diff", "Gene marker type", "Sample");
+                            "Peak Diff", "Gene marker type", "ABC support", "Sample");
                 }
             }
         }
@@ -363,13 +364,13 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                     writeCsvRow(writer,
                             record.getTargetGene(), linkedPeak, csvMetric(record.getLinkScore()),
                             csvMetric(record.getLinkFdr()), csvMetric(record.getVarQrna()),
-                            csvMetric(record.getVarQatac()), sourceLabel);
+                            csvMetric(record.getVarQatac()), record.getAbcSupport(), sourceLabel);
                 } else {
                     writeCsvRow(writer,
                             record.getTargetGene(), csvContext(record, domain), linkedPeak,
                             csvMetric(record.getLinkScore()), csvMarkerEvidence(record.getGeneLog2fc(), record.getGeneFdr()),
                             csvMarkerEvidence(record.getPeakLog2fc(), record.getPeakFdr()),
-                            firstNonBlank(record.getSignalType(), "-"), sourceLabel);
+                            firstNonBlank(record.getSignalType(), "-"), record.getAbcSupport(), sourceLabel);
                 }
             }
         }
@@ -531,6 +532,7 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                 domain,
                 countFilters,
                 signalType,
+                null,
                 () -> regulatoryAnnotationMapper.countMarkerGenes(
                         datasetId,
                         domain,
@@ -585,6 +587,7 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                 datasetId,
                 domain,
                 countFilters,
+                null,
                 null,
                 () -> regulatoryAnnotationMapper.countMarkerPeaks(
                         datasetId,
@@ -658,6 +661,7 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                     contextCellType,
                     contextCluster,
                     minP2gScore,
+                    countFilters,
                     limit,
                     offset,
                     fallbackOrderBy
@@ -669,6 +673,7 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                 dataDomain,
                 countFilters,
                 null,
+                "marker",
                 () -> regulatoryAnnotationMapper.countLinkedRegions(
                         datasetId,
                         dataDomain,
@@ -764,29 +769,39 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
             String contextCellType,
             String contextCluster,
             Double minP2gScore,
+            CountFilters countFilters,
             int limit,
             long offset,
             String orderBy
     ) {
-        long countStartedAt = System.nanoTime();
         String dataDomain = domain;
         String normalizedGene = targetGene != null ? targetGene.toUpperCase().trim() : null;
-        long total = regulatoryAnnotationMapper.countP2gDirect(
+        RegulatoryAnnotationCountCache.CountResult countResult = cachedCount(
+                AnnotationType.LINKED_REGION,
                 datasetId,
                 dataDomain,
-                normalizedGene,
-                peakFilter.exactPeak(),
-                peakFilter.chromosome(),
-                peakFilter.start(),
-                peakFilter.end(),
-                contextCellType,
-                contextCluster,
-                minP2gScore
+                countFilters,
+                null,
+                "all",
+                () -> regulatoryAnnotationMapper.countP2gDirect(
+                        datasetId,
+                        dataDomain,
+                        normalizedGene,
+                        peakFilter.exactPeak(),
+                        peakFilter.chromosome(),
+                        peakFilter.start(),
+                        peakFilter.end(),
+                        contextCellType,
+                        contextCluster,
+                        minP2gScore
+                )
         );
-        long countMillis = (System.nanoTime() - countStartedAt) / 1_000_000;
+        long total = countResult.total();
+        long countMillis = countResult.countMillis();
+        boolean countCacheHit = countResult.cacheHit();
 
         if (total == 0L || offset >= total) {
-            return new PagedRows(dataDomain, total, List.of(), countMillis, 0L, 0L, "p2g_fallback", false);
+            return new PagedRows(dataDomain, total, List.of(), countMillis, 0L, 0L, "p2g_fallback", countCacheHit);
         }
         long pageStartedAt = System.nanoTime();
         List<Long> pageIds = regulatoryAnnotationMapper.selectP2gDirectPageIds(
@@ -805,11 +820,11 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                 (int) offset
         );
         if (pageIds == null || pageIds.isEmpty()) {
-            return new PagedRows(dataDomain, total, List.of(), countMillis, (System.nanoTime() - pageStartedAt) / 1_000_000, 0L, "p2g_fallback", false);
+            return new PagedRows(dataDomain, total, List.of(), countMillis, (System.nanoTime() - pageStartedAt) / 1_000_000, 0L, "p2g_fallback", countCacheHit);
         }
         List<RegulatoryAnnotationRow> rows = regulatoryAnnotationMapper.selectP2gDirectByIds(pageIds);
         return new PagedRows(dataDomain, total, rows, countMillis,
-                (System.nanoTime() - pageStartedAt) / 1_000_000, 0L, "p2g_fallback", false);
+                (System.nanoTime() - pageStartedAt) / 1_000_000, 0L, "p2g_fallback", countCacheHit);
     }
 
     private RegulatoryAnnotationCountCache.CountResult cachedCount(
@@ -818,6 +833,7 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
             String dataDomain,
             CountFilters filters,
             String signalType,
+            String p2gMode,
             java.util.function.LongSupplier loader
     ) {
         return countCache.getOrLoad(
@@ -833,7 +849,8 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
                         filters.maxFdr(),
                         filters.minLog2fc(),
                         filters.minP2gScore(),
-                        signalType
+                        signalType,
+                        p2gMode
                 ),
                 loader
         );
@@ -1006,6 +1023,7 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
         record.setCorrelation(row.getCorrelation());
         record.setLinkFdr(row.getLinkFdr());
         record.setSignalType(trimToNull(row.getSignalType()));
+        record.setAbcSupport(row.getAbcSupport());
         record.setVarQrna(row.getVarQrna());
         record.setVarQatac(row.getVarQatac());
         record.setDistance(distanceToTss(normalizedGeneStart, normalizedGeneEnd, row));

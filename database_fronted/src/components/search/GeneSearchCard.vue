@@ -5,7 +5,10 @@
     <!-- Gene query label above both columns -->
     <span class="cte-query-label">
       <span class="cte-field-label">Gene query</span>
-      <span class="cte-max-badge">MAX input: 200 genes</span>
+      <span class="search-max-help-wrap">
+        <span class="cte-max-badge">MAX input: 200 genes</span>
+        <HelpTooltip text="Enter human gene symbols separated by line breaks, commas, or spaces. Symbols are converted to uppercase, duplicates are removed, and at most 200 unique genes are accepted." label="Gene query help" corner />
+      </span>
     </span>
 
     <!-- textarea + filters (left) || buttons (right) -->
@@ -33,42 +36,44 @@
               <span class="spg-help-icon">?</span>
             </el-tooltip>
           </span>
-          <button type="button" class="soft-btn" :disabled="loading" @click="loadExample">
-            <span>📋</span> Load example
-          </button>
-          <button type="button" class="soft-btn" :disabled="loading" @click="clearInput">
-            <span>✕</span> Clear
-          </button>
+          <span class="search-action-with-help">
+            <button type="button" class="soft-btn" :disabled="loading" @click="loadExample"><span>📋</span> Load example</button>
+            <HelpTooltip text="Replaces the current input with an example gene list so that the search workflow can be tried immediately." label="Load example help" corner />
+          </span>
+          <span class="search-action-with-help">
+            <button type="button" class="soft-btn" :disabled="loading" @click="clearInput"><span>✕</span> Clear</button>
+            <HelpTooltip text="Removes all gene symbols and input-validation messages. Search settings are kept unchanged." label="Clear gene input help" corner />
+          </span>
         </div>
         <input ref="fileInputRef" type="file" accept=".txt,.csv,.tsv" style="display:none" @change="onFileSelected" />
         <div v-if="geneInput.trim()" class="gsc-stat-row">
-          <div class="gsc-stat gsc-stat--muted"><span class="gsc-stat-num">{{ geneStats.total }}</span><span class="gsc-stat-label">Input genes</span></div>
-          <div class="gsc-stat"><span class="gsc-stat-num">{{ geneStats.valid }}</span><span class="gsc-stat-label">Valid genes</span></div>
-          <div class="gsc-stat" :class="{ 'gsc-stat--bad': geneStats.invalid > 0 }"><span class="gsc-stat-num">{{ geneStats.invalid }}</span><span class="gsc-stat-label">Invalid tokens</span></div>
+          <div class="gsc-stat gsc-stat--muted"><HelpTooltip text="Number of unique input tokens found after splitting the text and removing duplicates." label="Input genes help" corner /><span class="gsc-stat-num">{{ geneStats.total }}</span><span class="gsc-stat-label">Input genes</span></div>
+          <div class="gsc-stat"><HelpTooltip text="Number of input tokens that pass gene-symbol validation and can be submitted to the search." label="Valid genes help" corner /><span class="gsc-stat-num">{{ geneStats.valid }}</span><span class="gsc-stat-label">Valid genes</span></div>
+          <div class="gsc-stat" :class="{ 'gsc-stat--bad': geneStats.invalid > 0 }"><HelpTooltip text="Number of tokens rejected because they do not match the accepted human gene-symbol format." label="Invalid tokens help" corner /><span class="gsc-stat-num">{{ geneStats.invalid }}</span><span class="gsc-stat-label">Invalid tokens</span></div>
           <div v-if="geneLimitExceeded" class="gsc-stat gsc-stat--warn"><span class="gsc-stat-num">!</span><span class="gsc-stat-label">Max 200 exceeded</span></div>
         </div>
         <div class="gsc-filter-row">
-          <label class="cte-field"><span class="cte-field-label">Sort by</span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Sort by</span><HelpTooltip text="Chooses the initial ordering of the complete result set. Table-header sorting can be used after the search." label="Gene search sort help" /></span>
             <el-select v-model="sortBy" class="cte-select" popper-class="oscar-select-popper" :disabled="loading" @change="applySelectedSort">
               <el-option label="Dataset ID" value="sampleId" />
               <el-option label="Cell counts" value="cellCount" />
               <el-option label="Matched genes" value="matchedGenes" :disabled="parsedGenes.length <= 1" />
             </el-select>
           </label>
-          <label class="cte-field"><span class="cte-field-label">Per page</span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Per page</span><HelpTooltip text="Controls how many result rows are displayed on each page. It does not limit the number of results searched or downloaded." label="Gene results per page help" /></span>
             <el-select v-model="resultSize" class="cte-select" popper-class="oscar-select-popper" :disabled="loading">
               <el-option label="10" :value="10" />
               <el-option label="20" :value="20" />
               <el-option label="50" :value="50" />
             </el-select>
           </label>
-          <label class="cte-field"><span class="cte-field-label">Signal Type</span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Signal Type</span><HelpTooltip text="Selects which marker-gene measurement is searched: gene expression markers from RNA data or gene activity score markers derived from chromatin accessibility data." label="Signal type help" /></span>
             <el-select v-model="signalType" class="cte-select" popper-class="oscar-select-popper" :disabled="loading">
               <el-option label="Gene expression markers" value="gene_expression" />
               <el-option label="Gene score markers" value="gene_score" />
             </el-select>
           </label>
-          <label class="cte-field"><span class="cte-field-label">Tissue</span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Tissue</span><HelpTooltip text="Optionally restricts results to samples with the selected tissue label. All searches across every available tissue." label="Gene tissue filter help" /></span>
             <el-select
               v-model="tissue"
               class="cte-select"
@@ -87,10 +92,7 @@
         </div>
       </div>
       <div class="gsc-input-right">
-        <button type="button" class="primary-btn gsc-search-btn" :disabled="loading || !parsedGenes.length || geneLimitExceeded" @click="doSearch">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.5"/><line x1="14" y1="14" x2="18" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-          Search
-        </button>
+        <button type="button" class="primary-btn gsc-search-btn" :disabled="loading || !parsedGenes.length || geneLimitExceeded" @click="doSearch"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.5"/><line x1="14" y1="14" x2="18" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Search</button>
         <button type="button" class="soft-btn gsc-reset-btn" :disabled="loading" @click="resetAll">Reset</button>
       </div>
     </div>
@@ -102,11 +104,13 @@
       <!-- summary cards -->
       <div class="gsc-summary-row">
         <div class="gsc-summary-card">
+          <HelpTooltip text="Number of distinct OSCAR samples containing at least one marker record for the submitted genes under the selected filters." label="Matched samples help" corner />
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="3" width="14" height="12" rx="2" stroke="var(--brand-primary-3)" stroke-width="1.2"/><line x1="2" y1="7" x2="16" y2="7" stroke="var(--brand-primary-3)" stroke-width="1"/><line x1="6" y1="7" x2="6" y2="15" stroke="var(--brand-primary-3)" stroke-width="1"/></svg>
           <span class="gsc-sum-num">{{ result.matchedSamples }}</span>
           <span class="gsc-sum-label">Matched samples</span>
         </div>
         <div class="gsc-summary-card">
+          <HelpTooltip text="Total number of matching marker-gene records across all returned samples. Multiple records can come from the same sample." label="Marker records help" corner />
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 14L6 9l3 3 5-6" stroke="var(--brand-primary-3)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13" cy="5" r="2" stroke="var(--brand-primary-3)" stroke-width="1"/></svg>
           <span class="gsc-sum-num">{{ result.markerGeneEvidence }}</span>
           <span class="gsc-sum-label">Marker records</span>
@@ -115,29 +119,22 @@
 
       <!-- results header -->
       <div class="gsc-res-head">
-        <span class="gsc-res-title">Associated samples</span>
-        <button
-          type="button"
-          class="gsc-dl-btn"
-          title="Download all results as CSV"
-          @click="downloadTableCsv"
-        >
-          <el-icon><Download /></el-icon>
-        </button>
+        <span class="gsc-res-title search-title-with-help"><span>Associated samples</span><HelpTooltip text="One row per matched OSCAR sample. The table can be sorted by selecting a column header, and pagination changes only the displayed rows." label="Associated gene-search samples help" /></span>
+        <button type="button" class="gsc-dl-btn" title="Download all results as CSV" @click="downloadTableCsv"><el-icon><Download /></el-icon><span>Download</span></button>
       </div>
 
       <!-- table -->
       <div class="cte-table-wrap">
         <table class="cte-table">
           <thead><tr>
-            <th class="gsc-sort-th" @click="toggleSort('sampleId')">Dataset ID <span class="gsc-sort-arrow">{{ sortArrow('sampleId') }}</span></th>
-            <th class="gsc-sort-th" @click="toggleSort('tissue')">Tissue <span class="gsc-sort-arrow">{{ sortArrow('tissue') }}</span></th>
-            <th class="gsc-sort-th" @click="toggleSort('sampleName')">Sample name <span class="gsc-sort-arrow">{{ sortArrow('sampleName') }}</span></th>
-            <th class="gsc-sort-th" @click="toggleSort('platform')">Platform <span class="gsc-sort-arrow">{{ sortArrow('platform') }}</span></th>
-            <th class="gsc-sort-th" @click="toggleSort('sourceId')">Source ID <span class="gsc-sort-arrow">{{ sortArrow('sourceId') }}</span></th>
-            <th class="gsc-sort-th" @click="toggleSort('cellCount')">Cells <span class="gsc-sort-arrow">{{ sortArrow('cellCount') }}</span></th>
-            <th class="gsc-sort-th" @click="toggleSort('disease')">Disease <span class="gsc-sort-arrow">{{ sortArrow('disease') }}</span></th>
-            <th v-if="showMatchedGenes" class="gsc-sort-th" @click="toggleSort('matchedGenes')">Matched genes <span class="gsc-sort-arrow">{{ sortArrow('matchedGenes') }}</span></th>
+            <th class="gsc-sort-th" @click="toggleSort('sampleId')"><span class="search-table-header"><span>Dataset ID</span><HelpTooltip text="Unique OSCAR identifier for the matched sample. Select a value to open Sample Details." label="Dataset ID column help" /><span class="gsc-sort-arrow">{{ sortArrow('sampleId') }}</span></span></th>
+            <th class="gsc-sort-th" @click="toggleSort('tissue')"><span class="search-table-header"><span>Tissue</span><HelpTooltip text="Tissue label recorded for the matched sample." label="Tissue column help" /><span class="gsc-sort-arrow">{{ sortArrow('tissue') }}</span></span></th>
+            <th class="gsc-sort-th" @click="toggleSort('sampleName')"><span class="search-table-header"><span>Sample name</span><HelpTooltip text="Descriptive sample name supplied in the source metadata." label="Sample name column help" /><span class="gsc-sort-arrow">{{ sortArrow('sampleName') }}</span></span></th>
+            <th class="gsc-sort-th" @click="toggleSort('platform')"><span class="search-table-header"><span>Platform</span><HelpTooltip text="Experimental or sequencing platform recorded for the sample." label="Platform column help" /><span class="gsc-sort-arrow">{{ sortArrow('platform') }}</span></span></th>
+            <th class="gsc-sort-th" @click="toggleSort('sourceId')"><span class="search-table-header"><span>Source ID</span><HelpTooltip text="Source identifier or source label from the original sample metadata; it is separate from the OSCAR Dataset ID." label="Source ID column help" /><span class="gsc-sort-arrow">{{ sortArrow('sourceId') }}</span></span></th>
+            <th class="gsc-sort-th" @click="toggleSort('cellCount')"><span class="search-table-header"><span>Cells</span><HelpTooltip text="Total number of cells reported for the sample." label="Cells column help" /><span class="gsc-sort-arrow">{{ sortArrow('cellCount') }}</span></span></th>
+            <th class="gsc-sort-th" @click="toggleSort('disease')"><span class="search-table-header"><span>Disease</span><HelpTooltip text="Disease or condition status recorded for the sample." label="Disease column help" /><span class="gsc-sort-arrow">{{ sortArrow('disease') }}</span></span></th>
+            <th v-if="showMatchedGenes" class="gsc-sort-th" @click="toggleSort('matchedGenes')"><span class="search-table-header"><span>Matched genes</span><HelpTooltip text="Number of submitted genes with marker-gene evidence in this sample under the selected signal type." label="Matched genes column help" /><span class="gsc-sort-arrow">{{ sortArrow('matchedGenes') }}</span></span></th>
           </tr></thead>
           <tbody>
             <tr v-for="row in paginatedRows" :key="row.sampleId">
@@ -176,6 +173,7 @@ import { useRouter } from "vue-router";
 import { fetchSearchTissueOptions, runGeneSearch } from "@/api/analysis";
 import { parseFileContent, parseGenes as parseGenesSafe } from "@/utils/geneParser";
 import { downloadCsv } from "@/utils/downloadCsv";
+import HelpTooltip from "@/components/analysis/AnalysisHelpTooltip.vue";
 
 const EXAMPLE_GENES = ["MS4A1"];
 const MAX_GENES = 200;
@@ -460,6 +458,7 @@ function downloadTableCsv() {
 /* input row: left (textarea+filters) + right (buttons side by side) */
 .gsc-input-row { display: flex; gap: 16px; align-items: stretch; }
 .gsc-input-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.search-max-help-wrap { position: relative; display: inline-flex; }
 .gsc-input-right { display: flex; flex-direction: row; gap: 10px; flex-shrink: 0; align-items: stretch; }
 .gsc-search-btn { width: 110px; justify-content: center; font-size: 16px; }
 .gsc-reset-btn { width: 110px; justify-content: center; font-size: 16px; }
@@ -471,14 +470,14 @@ function downloadTableCsv() {
 .gsc-empty { padding: 32px; text-align: center; color: var(--muted); font-size: 14px; }
 
 .gsc-summary-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; align-items: start; }
-.gsc-summary-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); text-align: center; box-shadow: var(--shadow-card); }
+.gsc-summary-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); text-align: center; box-shadow: var(--shadow-card); }
 .gsc-sum-num { font-size: 22px; font-weight: 900; color: var(--text); }
 .gsc-sum-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
 
 .gsc-results { display: flex; flex-direction: column; gap: 12px; }
 .gsc-res-head { display: flex; align-items: center; justify-content: space-between; }
 .gsc-res-title { font-weight: 900; font-size: 14px; }
-.gsc-dl-btn { appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border-brand); border-radius: 999px; background: #fffffff2; color: var(--brand-primary-3); box-shadow: inset 0 1px 0 #ffffffcc, 0 6px 14px #12182614; cursor: pointer; transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, transform 0.18s ease; }
+.gsc-dl-btn { appearance: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 104px; height: 34px; padding: 0 12px; border: 1px solid var(--border-brand); border-radius: 10px; background: #fffffff2; color: var(--brand-primary-3); box-shadow: inset 0 1px 0 #ffffffcc, 0 6px 14px #12182614; cursor: pointer; font-weight: 850; transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, transform 0.18s ease; }
 .gsc-dl-btn:hover { border-color: var(--nav-active-border); background: var(--surface-2); color: var(--text); box-shadow: inset 0 1px 0 #ffffffcc, 0 8px 16px rgba(95,125,112,0.16); transform: translateY(-1px); }
 .gsc-dl-btn :deep(.el-icon) { font-size: 15px; }
 .gsc-view-tabs { display: flex; gap: 4px; }
@@ -495,6 +494,9 @@ function downloadTableCsv() {
 .cte-field { display: flex; flex-direction: column; gap: 5px; }
 .cte-field-label-row { display: inline-flex; align-items: center; gap: 5px; width: fit-content; }
 .cte-query-label { display: inline-flex; align-items: center; gap: 8px; width: fit-content; }
+.search-title-with-help,
+.search-table-header { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.search-action-with-help { position: relative; display: inline-flex; align-items: stretch; }
 .cte-max-badge { display: inline-flex; align-items: center; min-height: 20px; padding: 1px 8px; border: 1px solid rgba(95,125,112,0.24); border-radius: 999px; background: rgba(143,165,156,0.10); color: var(--brand-primary-3); font-size: 10px; font-weight: 900; letter-spacing: 0.02em; }
 .cte-field-label { font-size: 14px; font-weight: 900; color: rgba(39,66,58,0.84); }
 .gsc-match-help { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 999px; border: 1px solid var(--border-brand); color: var(--brand-primary-3); font-size: 9px; font-weight: 900; cursor: help; }
@@ -514,7 +516,7 @@ function downloadTableCsv() {
 .gsc-stat--warn .gsc-stat-num { color: #c8842a; font-size: 18px; }
 .gsc-sort-th { cursor: pointer; user-select: none; }
 .gsc-sort-th:hover { color: var(--brand-primary-3); }
-.gsc-sort-arrow { font-size: 10px; margin-left: 2px; }
+.gsc-sort-arrow { flex: 0 0 auto; font-size: 10px; margin-left: 5px; }
 .gsc-stat-num { font-size: 16px; font-weight: 900; color: var(--text); }
 .gsc-stat-label { font-size: 10px; font-weight: 700; color: var(--muted); }
 .cte-select { width: 100%; }
@@ -562,6 +564,14 @@ function downloadTableCsv() {
     flex-wrap: wrap;
   }
 
+  .gsc-input-right > .search-action-with-help {
+    flex: 1 1 0;
+  }
+
+  .gsc-input-right > .search-action-with-help > button {
+    width: 100%;
+  }
+
   .gsc-search-btn,
   .gsc-reset-btn {
     flex: 1 1 0;
@@ -595,6 +605,8 @@ function downloadTableCsv() {
   .gsc-filter-row .cte-field { flex: 1 1 100%; }
   .gsc-res-head { flex-wrap: wrap; gap: 8px; }
   .cte-btn-row .soft-btn,
+  .cte-btn-row > .search-action-with-help,
+  .cte-btn-row > .search-action-with-help > button,
   .spg-upload-wrap {
     width: 100%;
   }
