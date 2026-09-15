@@ -288,6 +288,12 @@ export async function fetchSequencePeak2GeneJob(jobId: string): Promise<Sequence
   return data;
 }
 
+export async function releaseSequencePeak2GeneJob(jobId: string): Promise<void> {
+  await axios.delete(
+    buildApiUrl(`api/analysis/sequence-peak2gene/jobs/${encodeURIComponent(jobId)}`)
+  );
+}
+
 export async function fetchSequencePeak2GeneEvidence(
   request: SequencePeak2GeneEvidenceRequest
 ): Promise<SequencePeak2GeneEvidenceResponse> {
@@ -512,6 +518,12 @@ export async function fetchPeakGeneContextJob(jobId: string): Promise<PeakGeneCo
     buildApiUrl(`api/analysis/peak-gene-context/jobs/${encodeURIComponent(jobId)}`)
   );
   return data;
+}
+
+export async function releasePeakGeneContextJob(jobId: string): Promise<void> {
+  await axios.delete(
+    buildApiUrl(`api/analysis/peak-gene-context/jobs/${encodeURIComponent(jobId)}`)
+  );
 }
 
 // =============================================================================

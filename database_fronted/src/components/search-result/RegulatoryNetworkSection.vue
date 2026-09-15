@@ -166,6 +166,18 @@
             @node-hover="setHoveredNode"
             @edge-hover="setHoveredEdge"
           />
+          <el-tooltip v-if="hasGraphData" placement="right" effect="light" :show-after="180">
+            <template #content>Download the current network or its visible links.</template>
+            <button
+              type="button"
+              class="annotation-download-button graph-download-button"
+              aria-label="Download current regulatory network"
+              @pointerdown.stop
+              @click.stop="openGraphDownloadDialog('network')"
+            >
+              <el-icon><Download /></el-icon>
+            </button>
+          </el-tooltip>
           <button v-if="hasGraphData" class="graph-reset-view" type="button" @click.stop="resetGraphView">
             Reset view
           </button>
@@ -295,7 +307,7 @@
           </div>
           <div class="table-subtitle">{{ visibleLinksSummary }}</div>
         </div>
-        <el-button class="soft-button" :disabled="visibleLinks.length === 0" @click="graphDownloadDialogOpen = true">
+        <el-button class="soft-button" :disabled="visibleLinks.length === 0" @click="openGraphDownloadDialog('table')">
           <el-icon><Download /></el-icon>
           <span>Download</span>
         </el-button>
@@ -501,7 +513,7 @@
     <el-dialog
       v-model="graphDownloadDialogOpen"
       width="640px"
-      title="Download graph visible links"
+      :title="graphDownloadDialogTitle"
       custom-class="bubble-dialog network-link-download-dialog"
       modal-class="network-link-download-overlay"
       :append-to-body="true"
@@ -513,6 +525,28 @@
           <span>{{ domainChip }}</span>
           <span>Current graph view</span>
         </div>
+        <template v-if="graphDownloadSource === 'network'">
+          <div class="network-link-download-section-title">Current network image</div>
+          <div class="network-link-download-grid network-link-download-grid--images">
+            <button
+              v-for="format in NETWORK_IMAGE_DOWNLOADS"
+              :key="format.value"
+              type="button"
+              class="network-link-download-chip"
+              :disabled="activeNetworkImageDownload !== null"
+              @click="downloadCurrentNetworkImage(format.value)"
+            >
+              <span class="network-link-download-copy">
+                <span class="network-link-download-name">{{ format.label }}</span>
+                <span class="network-link-download-description">{{ format.description }}</span>
+              </span>
+              <span class="network-link-download-action">
+                {{ activeNetworkImageDownload === format.value ? 'Preparing...' : 'Download' }}
+              </span>
+            </button>
+          </div>
+          <div class="network-link-download-section-title network-link-download-section-title--links">Graph visible links</div>
+        </template>
         <div class="network-link-download-grid">
           <button type="button" class="network-link-download-chip" @click="downloadVisibleNodesCsv">
             <span class="network-link-download-copy">
@@ -638,6 +672,7 @@ import {
   isSearchResultEndpointUnavailable,
 } from "@/api/searchResult";
 import RegulatoryNetworkSvg from "@/components/search-result/RegulatoryNetworkSvg.vue";
+import { downloadChartPdf } from "@/utils/downloadChart";
 import { domainDisplayLabel } from "@/utils/searchResultDomain";
 import type {
   GraphDimensions,
@@ -672,6 +707,8 @@ type InspectorKind = "gene" | "peak" | "edge";
 type QueryIntent = "default" | "gene" | "peak";
 type ExpandReason = "auto" | "manual";
 type PeakLabelMode = "overview" | "active" | "hidden";
+type GraphDownloadSource = "table" | "network";
+type NetworkImageFormat = "png" | "pdf" | "svg";
 
 type InspectorAction = {
   label: string;
@@ -702,51 +739,92 @@ type FullLinksAction = {
 };
 
 const NETWORK_TABLE_HELP = [
-  "Each row represents a peak-to-gene (P2G) link that is currently visible in the network graph above.",
-  "Searching, focusing, or expanding the graph can change which links appear here; table pagination does not change the graph.",
-  "Downloads use the complete current graph view rather than only the rows on the current table page.",
+  "Rows match the links currently drawn in the graph; search, focus, and expansion change this set, while pagination does not, and downloads include every visible link.",
+] as const;
+
+const NETWORK_IMAGE_DOWNLOADS: ReadonlyArray<{
+  value: NetworkImageFormat;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "png",
+    label: "PNG",
+    description: "High-resolution raster image of the current network view.",
+  },
+  {
+    value: "pdf",
+    label: "PDF",
+    description: "Document image of the current network view.",
+  },
+  {
+    value: "svg",
+    label: "SVG",
+    description: "Editable vector graphic with native nodes, edges, and labels.",
+  },
+];
+
+const SVG_EXPORT_STYLE_PROPERTIES = [
+  "color",
+  "display",
+  "dominant-baseline",
+  "fill",
+  "fill-opacity",
+  "fill-rule",
+  "filter",
+  "font-family",
+  "font-size",
+  "font-style",
+  "font-weight",
+  "letter-spacing",
+  "mix-blend-mode",
+  "opacity",
+  "paint-order",
+  "stroke",
+  "stroke-dasharray",
+  "stroke-dashoffset",
+  "stroke-linecap",
+  "stroke-linejoin",
+  "stroke-opacity",
+  "stroke-width",
+  "text-anchor",
+  "transform",
+  "transform-box",
+  "transform-origin",
+  "vector-effect",
+  "visibility",
 ] as const;
 
 const NETWORK_COLUMN_TOOLTIPS = {
   peak: [
-    "Genomic coordinates of the regulatory peak at one end of the visible P2G link.",
-    "Open the peak to inspect its complete feature details.",
+    "hg38 coordinates of the peak used in the ArchR link.",
   ],
   linkedGene: [
-    "Gene node connected to the listed peak by this visible P2G link.",
-    "The Node download contains the unique linked genes from the current graph view.",
+    "Gene whose RNA expression is linked to the peak accessibility.",
   ],
   distanceToTss: [
-    "Stored genomic distance between the peak and the transcription start site (TSS) of the linked gene.",
-    "The source value is shown without recalculation.",
+    "Peak-to-TSS distance in base pairs when available; a dash means the source did not provide it.",
   ],
   linkScore: [
-    "Strength assigned to this peak-to-gene link by the source P2G method.",
-    "A larger value indicates stronger source support and is not recalculated by OSCAR.",
+    "Stored score for this P2G link; higher values indicate stronger linkage.",
   ],
   correlation: [
-    "Correlation value reported for the peak-to-gene relationship by the source P2G analysis.",
-    "Positive and negative values indicate the direction of the reported association.",
+    "ArchR correlation between peak accessibility and gene expression; the sign gives the direction.",
   ],
   fdr: [
-    "P-value for the stored peak-to-gene link after correction for multiple tests.",
-    "A smaller value means the link is less likely to be due to chance.",
+    "ArchR false discovery rate for the correlation; lower values are more significant.",
   ],
   varQAtac: [
-    "Corrected variance value for the ATAC part of the P2G calculation.",
-    "A smaller value indicates stronger support from accessibility variation.",
+    "ArchR variance quantile for peak accessibility; higher values mean the peak is more variable.",
   ],
   varQRna: [
-    "Corrected variance value for the RNA part of the P2G calculation.",
-    "A smaller value indicates stronger support from RNA variation.",
+    "ArchR variance quantile for gene expression; higher values mean the gene is more variable.",
   ],
   source: [
-    "Source label stored for this peak-to-gene link.",
-    "It identifies the dataset or method provenance available for the current record.",
+    "Sample name supplying the link; Dataset ID is used when the name is missing.",
   ],
   action: [
-    "Open the link in the detail inspector above.",
-    "The graph selection is updated to the corresponding visible edge.",
+    "Open this link in the detail panel.",
   ],
 } as const;
 
@@ -828,6 +906,8 @@ const fullLinksTotal = ref(0);
 const fullLinksItems = ref<GraphLink[]>([]);
 const fullLinksError = ref("");
 const graphDownloadDialogOpen = ref(false);
+const graphDownloadSource = ref<GraphDownloadSource>("table");
+const activeNetworkImageDownload = ref<NetworkImageFormat | null>(null);
 
 let requestToken = 0;
 let fullLinksRequestToken = 0;
@@ -838,6 +918,9 @@ const linkPageSizeOptions = [10, 20, 50];
 const fullLinksPageSizeOptions = [20, 50, 100];
 const domainChip = computed(() => domainDisplayLabel(props.domain));
 const domainTitle = computed(() => domainChip.value);
+const graphDownloadDialogTitle = computed(() => graphDownloadSource.value === "network"
+  ? "Download current network"
+  : "Download graph visible links");
 const hasGraphData = computed(() => visibleGraph.value.nodes.length > 0);
 const nodeById = computed(() => new Map(visibleGraph.value.nodes.map((node) => [node.id, node] as const)));
 const edgeById = computed(() => new Map(visibleGraph.value.edges.map((edge) => [edge.id, edge] as const)));
@@ -2198,6 +2281,160 @@ function onFullLinksPageChange(page: number) {
   void loadFullLinks();
 }
 
+function openGraphDownloadDialog(source: GraphDownloadSource) {
+  graphDownloadSource.value = source;
+  graphDownloadDialogOpen.value = true;
+}
+
+async function downloadCurrentNetworkImage(format: NetworkImageFormat) {
+  if (activeNetworkImageDownload.value !== null) return;
+  activeNetworkImageDownload.value = format;
+
+  try {
+    const exported = serializeCurrentNetworkSvg();
+    const filenameBase = `${sanitizeFilenamePart(props.datasetId)}_${props.domain}_regulatory_network_current_view`;
+    let started = false;
+
+    if (format === "svg") {
+      started = startBlobDownload(
+        new Blob([exported.content], { type: "image/svg+xml;charset=utf-8" }),
+        `${filenameBase}.svg`
+      );
+    } else {
+      const canvas = await renderNetworkSvgToCanvas(exported, 2);
+      if (format === "png") {
+        const pngBlob = await canvasToBlob(canvas, "image/png");
+        started = startBlobDownload(pngBlob, `${filenameBase}.png`);
+      } else {
+        const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.96);
+        started = downloadChartPdf(
+          {
+            getDataURL: () => jpegDataUrl,
+            getWidth: () => exported.width,
+            getHeight: () => exported.height,
+          },
+          `${filenameBase}.pdf`,
+          { pixelRatio: 2, backgroundColor: "#ffffff" }
+        );
+      }
+    }
+
+    if (!started) throw new Error(`Unable to start ${format.toUpperCase()} download`);
+    graphDownloadDialogOpen.value = false;
+    ElMessage.success(`${format.toUpperCase()} network download started.`);
+  } catch (downloadError) {
+    console.warn("[RegulatoryNetwork] Failed to export current network:", downloadError);
+    ElMessage.error(`Unable to export the current network as ${format.toUpperCase()}.`);
+  } finally {
+    activeNetworkImageDownload.value = null;
+  }
+}
+
+type SerializedNetworkSvg = {
+  content: string;
+  width: number;
+  height: number;
+};
+
+function serializeCurrentNetworkSvg(): SerializedNetworkSvg {
+  const source = graphHostEl.value?.querySelector<SVGSVGElement>("svg.network-svg");
+  if (!source) throw new Error("Network SVG is not available");
+
+  const clone = source.cloneNode(true) as SVGSVGElement;
+  const sourceElements = [source, ...Array.from(source.querySelectorAll<SVGElement>("*"))];
+  const clonedElements = [clone, ...Array.from(clone.querySelectorAll<SVGElement>("*"))];
+
+  sourceElements.forEach((sourceElement, index) => {
+    const clonedElement = clonedElements[index];
+    if (!clonedElement) return;
+    const computedStyle = window.getComputedStyle(sourceElement);
+    const declarations = SVG_EXPORT_STYLE_PROPERTIES.flatMap((property) => {
+      const value = computedStyle.getPropertyValue(property);
+      if (!value || ((property === "filter" || property === "transform") && value === "none")) return [];
+      return [`${property}:${value}`];
+    });
+    const existingStyle = clonedElement.getAttribute("style")?.trim();
+    clonedElement.setAttribute(
+      "style",
+      [existingStyle, ...declarations, "animation:none", "transition:none"].filter(Boolean).join(";")
+    );
+  });
+
+  const width = Math.max(1, Math.round(graphDimensions.value.width));
+  const height = Math.max(1, Math.round(graphDimensions.value.height));
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+  clone.setAttribute("width", String(width));
+  clone.setAttribute("height", String(height));
+  clone.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+  const background = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  background.setAttribute("x", "0");
+  background.setAttribute("y", "0");
+  background.setAttribute("width", String(width));
+  background.setAttribute("height", String(height));
+  background.setAttribute("fill", "#f8fcfb");
+  background.setAttribute("data-export-layer", "background");
+  clone.insertBefore(background, clone.firstChild);
+
+  if (clone.querySelector("image")) {
+    throw new Error("Editable SVG export cannot contain raster images");
+  }
+
+  return {
+    content: `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(clone)}`,
+    width,
+    height,
+  };
+}
+
+async function renderNetworkSvgToCanvas(exported: SerializedNetworkSvg, pixelRatio: number): Promise<HTMLCanvasElement> {
+  const sourceUrl = URL.createObjectURL(new Blob([exported.content], { type: "image/svg+xml;charset=utf-8" }));
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error("Browser could not render the exported network SVG"));
+      element.src = sourceUrl;
+    });
+    const scale = Math.max(1, pixelRatio);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(exported.width * scale));
+    canvas.height = Math.max(1, Math.round(exported.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas 2D context is not available");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.setTransform(scale, 0, 0, scale, 0, 0);
+    context.drawImage(image, 0, 0, exported.width, exported.height);
+    return canvas;
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error(`Unable to encode canvas as ${type}`));
+    }, type);
+  });
+}
+
+function startBlobDownload(blob: Blob, filename: string): boolean {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  return true;
+}
+
 function downloadVisibleTableCsv() {
   if (!visibleLinks.value.length) return;
   downloadLinksCsv(
@@ -2752,6 +2989,60 @@ defineExpose({
     0 8px 18px rgba(15, 23, 42, 0.085),
     inset 0 1px 0 rgba(255, 255, 255, 0.72);
   transform: translateY(-1px);
+}
+
+.annotation-download-button {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border-brand);
+  border-radius: 999px;
+  background: #fffffff2;
+  color: var(--brand-primary-3);
+  box-shadow:
+    inset 0 1px 0 #ffffffcc,
+    0 6px 14px #12182614;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.annotation-download-button:hover:not(:disabled) {
+  border-color: var(--nav-active-border);
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow:
+    inset 0 1px 0 #ffffffcc,
+    0 8px 16px rgba(95, 125, 112, 0.16);
+  transform: translateY(-1px);
+}
+
+.annotation-download-button:focus-visible {
+  outline: 2px solid var(--detail-teal-focus);
+  outline-offset: 2px;
+}
+
+.annotation-download-button :deep(.el-icon) {
+  font-size: 15px;
+}
+
+.graph-download-button {
+  position: absolute;
+  top: 48px;
+  left: 20px;
+  z-index: 3;
+  flex: 0 0 32px;
+  backdrop-filter: blur(12px) saturate(112%);
 }
 
 .graph-legend {
@@ -3602,6 +3893,23 @@ defineExpose({
   gap: 10px;
 }
 
+.network-link-download-grid--images {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.network-link-download-section-title {
+  margin-bottom: 8px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.network-link-download-section-title--links {
+  padding-top: 14px;
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
 .network-link-download-chip {
   display: flex;
   align-items: center;
@@ -3622,6 +3930,21 @@ defineExpose({
   border-color: rgba(0, 0, 0, 0.12);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
   transform: translateY(-1px);
+}
+
+.network-link-download-chip:disabled {
+  cursor: wait;
+  opacity: 0.68;
+  transform: none;
+}
+
+.network-link-download-grid--images .network-link-download-chip {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.network-link-download-grid--images .network-link-download-action {
+  align-self: flex-start;
 }
 
 .network-link-download-copy {
@@ -3744,6 +4067,10 @@ defineExpose({
   }
 
   .network-browser {
+    grid-template-columns: 1fr;
+  }
+
+  .network-link-download-grid--images {
     grid-template-columns: 1fr;
   }
 

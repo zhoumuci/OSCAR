@@ -305,6 +305,12 @@ public class SearchService {
         return resp;
     }
 
+    public List<Map<String, Object>> tissuesByCellType(String cellType) {
+        String normalizedCellType = cellType == null ? "" : cellType.trim();
+        if (normalizedCellType.isEmpty()) return List.of();
+        return mapper.findTissuesByCellType(normalizedCellType);
+    }
+
     private GeneSearchResponse buildResponse(List<String> dsIds, List<Map<String, Object>> hits, String mode) {
         String tissue = null;
         Map<String, Map<String, Object>> sampleMap = new LinkedHashMap<>();

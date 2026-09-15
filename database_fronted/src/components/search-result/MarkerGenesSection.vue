@@ -240,20 +240,10 @@
               >
                 <template #content>
                   <div v-if="column.kind === 'signal-type'">
-                    <div class="signal-legend">
-                      <span class="signal-dot signal-dot--exp" /> Gene expression marker
-                      &nbsp;&nbsp;
-                      <span class="signal-dot signal-dot--score" /> Gene activity score marker
-                    </div>
-                    <div>Shows which marker-gene measurement supplied the gene values in this row.</div>
+                    Gene expression marks RNA-derived values; gene activity score marks accessibility-derived values.
                   </div>
                   <div v-else-if="column.kind === 'abc-support'">
-                    <div class="abc-support-legend">
-                      <span class="abc-support-dot abc-support-dot--supported" /> ABC supported
-                      &nbsp;&nbsp;
-                      <span class="abc-support-dot abc-support-dot--unsupported" /> Evaluated but unsupported
-                    </div>
-                    <div>Shows whether this stored peak-to-gene link is supported by the Activity-by-Contact model.</div>
+                    ABC support for the link: blue is supported, gray is evaluated but unsupported, and a dash is not evaluated.
                   </div>
                   <div v-else><div v-for="line in column.headerTooltip" :key="line">{{ line }}</div></div>
                 </template>
@@ -586,28 +576,28 @@ const annotationTabConfig: Record<RegulatoryAnnotationType, AnnotationTabConfig>
 };
 
 const COLUMN_TOOLTIPS = {
-  geneRegion: ["Genomic coordinates assigned to the marker gene in the source annotation.", "The displayed interval is the gene location, not the promoter interval."],
-  promoterRegion: ["The promoter interval used by OSCAR for this gene.", "It spans 2 kb upstream and 2 kb downstream of the transcription start site."],
-  markerGeneLog2fc: ["Log2 fold-change reported for this marker gene in the listed cell type or cluster.", "A larger positive value means the gene is more strongly increased in that group."],
-  markerGeneFdr: ["P-value after correction for testing many genes.", "A smaller value means the marker-gene result is less likely to be due to chance."],
-  markerGeneMeanDiff: ["Difference between the gene's average value in the selected group and the comparison cells.", "The exact source value is kept when a dataset uses its own equivalent marker statistic."],
-  markerGeneSample: ["OSCAR dataset identifier, sample name, and data type that supplied this row.", "Use the sample link to open the complete sample details."],
-  markerPeakPeak: ["Chromosome, start, and end of the marker accessibility peak.", "The coordinates are the stored peak interval for the listed sample and cell type or cluster."],
-  markerPeakLinkedGene: ["Gene name attached to this marker peak by the source annotation when one is available.", "This label alone does not prove a cell-type-specific regulatory link."],
-  markerPeakLog2fc: ["Log2 fold-change in accessibility for this marker peak in the listed cell type or cluster.", "A larger positive value means the peak is more accessible in that group."],
-  markerPeakFdr: ["P-value after correction for testing many peaks.", "A smaller value means the marker-peak result is less likely to be due to chance."],
-  markerPeakMeanDiff: ["Difference between average accessibility in the selected group and the comparison cells.", "The exact source value is kept when a dataset uses its own equivalent marker statistic."],
-  markerPeakSample: ["OSCAR dataset identifier, sample name, and data type that supplied this marker peak.", "Use the sample link to open the complete sample details."],
-  p2gGene: ["Gene at the gene end of the stored peak-to-gene link.", "This value comes from the P2G table."],
-  p2gLinkedPeak: ["Peak interval at the peak end of the stored peak-to-gene link.", "This value comes from the P2G table and can be opened in the peak details page."],
-  p2gMarkerGene: ["Gene at the gene end of the stored peak-to-gene link.", "In Marker mode, this gene must also be an OSCAR marker gene in the same sample and cell type or cluster.", "Each displayed row therefore has marker support at both the gene end and the peak end; it is not selected from the P2G table alone."],
-  p2gMarkerPeak: ["Peak interval at the peak end of the stored peak-to-gene link.", "In Marker mode, this peak must also be an OSCAR marker peak in the same sample and cell type or cluster.", "Each displayed row therefore has marker support at both the peak end and the gene end; it is not selected from the P2G table alone."],
-  p2gScore: ["Strength assigned to this peak-to-gene link by the source P2G method.", "It describes the stored link and is not recalculated separately for each cell type."],
-  p2gGeneEvidence: ["Marker-gene values for the gene end of this P2G link, including Log2FC and FDR when available.", "Their presence confirms that the linked gene is a marker in the matching sample and cell type or cluster."],
-  p2gPeakEvidence: ["Marker-peak values for the peak end of this P2G link, including Log2FC and FDR when available.", "Their presence confirms that the linked peak is a marker in the same sample and cell type or cluster."],
-  p2gAbcSupport: ["Whether this stored peak-to-gene link is supported by the Activity-by-Contact model.", "Blue means ABC supported; gray means evaluated but unsupported. A dash means the link was not evaluated."],
-  p2gSample: ["OSCAR dataset identifier, sample name, and data type for the stored P2G link.", "Use the sample link to open the complete sample details."],
-  tf: ["Reserved for a future transcription-factor annotation.", "A blank value means this information is not available in the current data."],
+  geneRegion: ["Genomic coordinates of the marker gene; this is the gene body, not its promoter."],
+  promoterRegion: ["Promoter interval spanning 2 kb on each side of the transcription start site."],
+  markerGeneLog2fc: ["Log2 fold change for the marker gene; larger positive values indicate stronger enrichment in the listed group."],
+  markerGeneFdr: ["Multiple-testing adjusted P value for the marker gene; smaller values indicate stronger evidence."],
+  markerGeneMeanDiff: ["Difference in mean gene signal between the listed group and the comparison cells."],
+  markerGeneSample: ["Dataset, sample name, and assay supplying this marker-gene record."],
+  markerPeakPeak: ["hg38 coordinates of the marker accessibility peak."],
+  markerPeakLinkedGene: ["Gene associated with the marker peak in the source annotation, when available."],
+  markerPeakLog2fc: ["Log2 fold change in peak accessibility; larger positive values indicate greater accessibility in the listed group."],
+  markerPeakFdr: ["Multiple-testing adjusted P value for the marker peak; smaller values indicate stronger evidence."],
+  markerPeakMeanDiff: ["Difference in mean peak accessibility between the listed group and the comparison cells."],
+  markerPeakSample: ["Dataset, sample name, and assay supplying this marker-peak record."],
+  p2gGene: ["Gene at the gene end of the stored peak-to-gene link."],
+  p2gLinkedPeak: ["hg38 interval at the peak end of the stored peak-to-gene link."],
+  p2gMarkerGene: ["Linked gene with marker-gene support in the same sample and cell type or cluster."],
+  p2gMarkerPeak: ["Linked peak with marker-peak support in the same sample and cell type or cluster."],
+  p2gScore: ["Score assigned to the stored peak-to-gene link; larger values indicate stronger linkage."],
+  p2gGeneEvidence: ["Log2FC and FDR for marker-gene support at the gene end of this link."],
+  p2gPeakEvidence: ["Log2FC and FDR for marker-peak support at the peak end of this link."],
+  p2gAbcSupport: ["ABC support for the link: blue is supported, gray is evaluated but unsupported, and a dash is not evaluated."],
+  p2gSample: ["Dataset, sample name, and assay supplying this peak-to-gene link."],
+  tf: ["Transcription-factor annotation; blank when no value is available."],
 } as const;
 
 const pageSizeOptions = [10, 20, 50];

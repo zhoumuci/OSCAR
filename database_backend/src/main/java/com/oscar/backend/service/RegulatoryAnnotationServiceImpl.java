@@ -417,7 +417,7 @@ public class RegulatoryAnnotationServiceImpl implements RegulatoryAnnotationServ
     }
 
     @Override
-    @org.springframework.cache.annotation.Cacheable(value = "contextOptions", key = "#datasetId + ':' + #domain + ':' + #annotationType")
+    @org.springframework.cache.annotation.Cacheable(value = "contextOptions", key = "#datasetId + ':' + #domain + ':' + #annotationType", sync = true)
     public List<RegulatoryAnnotationContextOption> getRegulatoryAnnotationContextOptions(
             String datasetId,
             String domain,

@@ -68,6 +68,12 @@ public class AnalysisController {
                 .body(sequenceJobService.get(jobId));
     }
 
+    @DeleteMapping("/sequence-peak2gene/jobs/{jobId}")
+    public ResponseEntity<Void> releaseSequencePeak2GeneJob(@PathVariable String jobId) {
+        sequenceJobService.releaseFinished(jobId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/sequence-peak2gene/evidence")
     public SequencePeak2GeneEvidenceResponse sequencePeak2GeneEvidence(
             @RequestBody SequencePeak2GeneEvidenceRequest request
@@ -104,6 +110,12 @@ public class AnalysisController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(peakGeneContextJobService.get(jobId));
+    }
+
+    @DeleteMapping("/peak-gene-context/jobs/{jobId}")
+    public ResponseEntity<Void> releasePeakGeneContextJob(@PathVariable String jobId) {
+        peakGeneContextJobService.releaseFinished(jobId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/cell-type-enrichment")

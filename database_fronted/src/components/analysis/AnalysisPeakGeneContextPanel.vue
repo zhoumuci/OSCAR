@@ -36,7 +36,7 @@
               <span class="pgc-button-help-wrap">
                 <button type="button" class="soft-btn" :disabled="loading" @click="peakFileRef?.click()">Upload BED</button>
                 <el-tooltip placement="top" effect="light" :show-after="200">
-                  <template #content><div><div>Accepted files: .bed and .txt.</div><div>Each row must contain chr:start-end or the first three BED columns: chromosome, start, and end.</div></div></template>
+                  <template #content><div>Accepts .bed or .txt files containing chr:start-end or the first three BED columns.</div></template>
                   <span class="pgc-help-icon" role="button" tabindex="0" aria-label="Upload peak file help">?</span>
                 </el-tooltip>
               </span>
@@ -92,7 +92,7 @@
               <span class="pgc-button-help-wrap">
                 <button type="button" class="soft-btn" :disabled="loading" @click="geneFileRef?.click()">Upload file</button>
                 <el-tooltip placement="top" effect="light" :show-after="200">
-                  <template #content><div><div>Accepted files: .txt and .csv.</div><div>Gene symbols may appear one per line or in delimited cells. Duplicate symbols are removed before matching.</div></div></template>
+                  <template #content><div>Accepts .txt or .csv files containing gene symbols; duplicate symbols are removed.</div></template>
                   <span class="pgc-help-icon" role="button" tabindex="0" aria-label="Upload gene file help">?</span>
                 </el-tooltip>
               </span>
@@ -178,11 +178,7 @@
                 Reference mode
                 <el-tooltip placement="top" effect="light" :show-after="200">
                   <template #content>
-                    <div class="pgc-tooltip-copy">
-                      <div>This setting decides whether ordinary P2G links are enough or marker evidence is also required.</div>
-                      <div><strong>Peak-to-Gene links only:</strong> return P2G links that match the submitted genes, tissue or dataset, and overlapping peak regions.</div>
-                      <div><strong>Peak-to-Gene links + marker:</strong> start from the same matches, then keep only links whose peak and gene are both markers in the same dataset and cell type or cluster.</div>
-                    </div>
+                    <div class="pgc-tooltip-copy">P2G only matches stored links; P2G + markers also requires marker-gene and marker-peak support in the same dataset and cell context.</div>
                   </template>
                   <span class="pgc-help-icon pgc-help-icon--inline" role="button" tabindex="0" aria-label="Reference mode help">?</span>
                 </el-tooltip>
@@ -519,6 +515,7 @@ import {
   fetchPeakGeneContextDatasets,
   fetchPeakGeneContextJob,
   fetchPeakGeneContextTissues,
+  releasePeakGeneContextJob,
   submitPeakGeneContextJob,
   type PeakGeneContextDatasetOption,
   type PeakGeneContextJobResponse,
@@ -537,31 +534,31 @@ type ResultTab = "table" | "cell_chart" | "bubble" | "network";
 type NetworkNode = PeakGeneContextResponse["networkData"]["nodes"][number];
 
 const PGC_HELP = {
-  peakInput: "Enter 1–100 genomic regions in hg38 coordinates, one per line. Use chr:start-end or the first three BED columns. Invalid or duplicate regions must be corrected before analysis.",
-  geneInput: "Enter 1–100 human gene symbols separated by line breaks, commas, spaces, or semicolons. Symbols are converted to uppercase, and invalid or duplicate entries must be corrected before analysis.",
-  loadSample: "Loads the built-in GBM Peak-to-Gene example into both input boxes and selects Brain. The peak input uses the first three BED columns, and Dataset remains unrestricted.",
-  clearPeaks: "Removes every peak region from the peak input. Existing results are cleared because they no longer match the current input.",
-  clearGenes: "Removes every gene symbol from the gene input. Existing results are cleared because they no longer match the current input.",
-  inputPeaks: "Number of non-empty peak rows currently entered, including rows that may later be rejected as malformed or duplicate.",
-  validPeaks: "Number of unique peak regions successfully normalised from the current input and eligible for analysis.",
-  invalidPeaks: "Number of malformed or duplicate peak rows. These rows must be corrected or removed before the analysis can run.",
-  inputGenes: "Number of non-empty gene tokens currently entered, including tokens that may later be rejected as malformed or duplicate.",
-  validGenes: "Number of unique, valid gene symbols successfully normalised from the current input and eligible for analysis.",
-  invalidGenes: "Number of malformed or duplicate gene tokens. These tokens must be corrected or removed before the analysis can run.",
-  advancedSettings: "Shows or hides controls for the minimum genomic overlap and the maximum number of result records returned.",
-  tissue: "Required. This limits the search to OSCAR datasets from the selected tissue. It also determines which datasets appear in the Dataset list.",
-  dataset: "Optional. Choose one dataset to search only that sample. Leave it blank to search every available dataset in the selected tissue.",
-  resultType: "General returns one row for each unique matching P2G link. Cell type is available only in marker mode and returns marker-supported rows with their cell type or cluster context.",
-  minOverlap: "Minimum number of base pairs shared by a submitted region and a candidate OSCAR P2G peak. For example, a value of 10 requires at least 10 overlapping bases. Increasing it makes region matching stricter.",
-  maxReturned: "Optional limit applied after all matches are found and ranked. Leave it blank to return every match. If a limit is used, the summary cards still describe the complete matched set, so their totals may be larger than the number of table rows.",
-  runAnalysis: "Validates the inputs, retrieves indexed candidate P2G links for the selected scope, applies the bedtools overlap, adds marker context when requested, and builds the result views.",
-  reset: "Clears all inputs, settings, results, sorting, pagination, progress, and open download dialogs, restoring the default P2G analysis state.",
-  summaryTotal: "Total matches found before the optional maximum-return cap. General mode counts unique P2G links; Cell type mode counts marker-supported context records.",
-  summaryDatasets: "Number of distinct OSCAR datasets represented across the complete matched result set.",
-  summaryPeaks: "Number of distinct P2G peak regions represented across the complete matched result set.",
-  summaryGenes: "Number of distinct linked genes represented across the complete matched result set.",
-  summaryCellTypes: "Number of distinct cell types or clusters represented across the complete marker-supported matched result set.",
-  topCellType: "The cell type or cluster with the greatest number of marker-supported matched records in the complete result set.",
+  peakInput: "Enter up to 100 hg38 regions as chr:start-end or BED coordinates.",
+  geneInput: "Enter up to 100 human gene symbols; separators are flexible and symbols are matched in uppercase.",
+  loadSample: "Loads the GBM example with Brain, P2G + markers, and Cell type selected.",
+  clearPeaks: "Clears the peak input and its current results.",
+  clearGenes: "Clears the gene input and its current results.",
+  inputPeaks: "Number of non-empty region rows entered.",
+  validPeaks: "Number of unique hg38 regions ready for analysis.",
+  invalidPeaks: "Number of malformed or duplicate region rows.",
+  inputGenes: "Number of non-empty gene tokens entered.",
+  validGenes: "Number of unique gene symbols ready for analysis.",
+  invalidGenes: "Number of malformed or duplicate gene tokens.",
+  advancedSettings: "Opens the overlap and result-limit controls.",
+  tissue: "Limits the analysis to datasets from the selected tissue.",
+  dataset: "Limits the analysis to one dataset; leave blank to use all datasets in the selected tissue.",
+  resultType: "General shows unique P2G links. Cell type keeps the marker cell type or cluster.",
+  minOverlap: "Minimum shared bases required between an input region and a P2G peak.",
+  maxReturned: "Caps returned rows after ranking; summary totals still describe all matches.",
+  runAnalysis: "Matches the input regions and genes to P2G links, adding marker context when selected.",
+  reset: "Restores the default P2G settings and clears inputs and results.",
+  summaryTotal: "Matches found before the optional row limit is applied.",
+  summaryDatasets: "Distinct datasets represented by the matched records.",
+  summaryPeaks: "Distinct linked peak regions in the matched records.",
+  summaryGenes: "Distinct linked genes in the matched records.",
+  summaryCellTypes: "Distinct cell types or clusters in marker-supported matches.",
+  topCellType: "Cell type or cluster with the most marker-supported matches.",
 } as const;
 
 const peakInput = ref("");
@@ -938,6 +935,8 @@ function loadGbmSample() {
   geneInput.value = ["GFAP", "SOX2", "OLIG2", "EGFR"].join("\n");
   datasetId.value = "";
   tissue.value = "Brain";
+  referenceMode.value = "p2g_markers";
+  resultType.value = "cell_type";
 }
 
 async function onPeakFileSelected(event: Event) {
@@ -1050,6 +1049,8 @@ async function runAnalysis() {
     pairSortDirection.value = "desc";
     jobProgress.value = 100;
     progressStage.value = "COMPLETED";
+    await nextTick();
+    void releasePeakGeneContextJob(submitted.jobId).catch(() => undefined);
   } catch (error) {
     progressStage.value = "FAILED";
     progressMessage.value = errorMessage(error, "Peak-to-Gene analysis failed.");

@@ -7,7 +7,7 @@
       <span class="cte-field-label">Gene query</span>
       <span class="search-max-help-wrap">
         <span class="cte-max-badge">MAX input: 200 genes</span>
-        <HelpTooltip text="Enter human gene symbols separated by line breaks, commas, or spaces. Symbols are converted to uppercase, duplicates are removed, and at most 200 unique genes are accepted." label="Gene query help" corner />
+        <HelpTooltip text="Enter up to 200 human gene symbols; separators are flexible and duplicates are removed." label="Gene query help" corner />
       </span>
     </span>
 
@@ -31,18 +31,18 @@
             </button>
             <el-tooltip placement="top" effect="light" :show-after="200">
               <template #content>
-                <div><div>Accepted files: .txt, .csv, and .tsv.</div><div>The parser reads a recognised gene column when one is present; otherwise it reads gene symbols from the text cells. Duplicate symbols are removed.</div></div>
+                <div>Accepts .txt, .csv, or .tsv files containing gene symbols; duplicate symbols are removed.</div>
               </template>
               <span class="spg-help-icon">?</span>
             </el-tooltip>
           </span>
           <span class="search-action-with-help">
             <button type="button" class="soft-btn" :disabled="loading" @click="loadExample"><span>📋</span> Load example</button>
-            <HelpTooltip text="Replaces the current input with an example gene list so that the search workflow can be tried immediately." label="Load example help" corner />
+            <HelpTooltip text="Replaces the input with an example gene list." label="Load example help" corner />
           </span>
           <span class="search-action-with-help">
             <button type="button" class="soft-btn" :disabled="loading" @click="clearInput"><span>✕</span> Clear</button>
-            <HelpTooltip text="Removes all gene symbols and input-validation messages. Search settings are kept unchanged." label="Clear gene input help" corner />
+            <HelpTooltip text="Clears the gene input while keeping the search settings." label="Clear gene input help" corner />
           </span>
         </div>
         <input ref="fileInputRef" type="file" accept=".txt,.csv,.tsv" style="display:none" @change="onFileSelected" />
@@ -53,27 +53,27 @@
           <div v-if="geneLimitExceeded" class="gsc-stat gsc-stat--warn"><span class="gsc-stat-num">!</span><span class="gsc-stat-label">Max 200 exceeded</span></div>
         </div>
         <div class="gsc-filter-row">
-          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Sort by</span><HelpTooltip text="Chooses the initial ordering of the complete result set. Table-header sorting can be used after the search." label="Gene search sort help" /></span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Sort by</span><HelpTooltip text="Sets the initial order of the complete result set." label="Gene search sort help" /></span>
             <el-select v-model="sortBy" class="cte-select" popper-class="oscar-select-popper" :disabled="loading" @change="applySelectedSort">
               <el-option label="Dataset ID" value="sampleId" />
               <el-option label="Cell counts" value="cellCount" />
               <el-option label="Matched genes" value="matchedGenes" :disabled="parsedGenes.length <= 1" />
             </el-select>
           </label>
-          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Per page</span><HelpTooltip text="Controls how many result rows are displayed on each page. It does not limit the number of results searched or downloaded." label="Gene results per page help" /></span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Per page</span><HelpTooltip text="Rows shown per page; searching and CSV download still use the full result set." label="Gene results per page help" /></span>
             <el-select v-model="resultSize" class="cte-select" popper-class="oscar-select-popper" :disabled="loading">
               <el-option label="10" :value="10" />
               <el-option label="20" :value="20" />
               <el-option label="50" :value="50" />
             </el-select>
           </label>
-          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Signal Type</span><HelpTooltip text="Selects which marker-gene measurement is searched: gene expression markers from RNA data or gene activity score markers derived from chromatin accessibility data." label="Signal type help" /></span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Signal Type</span><HelpTooltip text="Gene expression searches RNA markers; gene score searches accessibility-derived activity markers." label="Signal type help" /></span>
             <el-select v-model="signalType" class="cte-select" popper-class="oscar-select-popper" :disabled="loading">
               <el-option label="Gene expression markers" value="gene_expression" />
               <el-option label="Gene score markers" value="gene_score" />
             </el-select>
           </label>
-          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Tissue</span><HelpTooltip text="Optionally restricts results to samples with the selected tissue label. All searches across every available tissue." label="Gene tissue filter help" /></span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Tissue</span><HelpTooltip text="Restricts results to the selected tissue; All searches every tissue." label="Gene tissue filter help" /></span>
             <el-select
               v-model="tissue"
               class="cte-select"
@@ -119,7 +119,7 @@
 
       <!-- results header -->
       <div class="gsc-res-head">
-        <span class="gsc-res-title search-title-with-help"><span>Associated samples</span><HelpTooltip text="One row per matched OSCAR sample. The table can be sorted by selecting a column header, and pagination changes only the displayed rows." label="Associated gene-search samples help" /></span>
+        <span class="gsc-res-title search-title-with-help"><span>Associated samples</span><HelpTooltip text="One row per matched sample; header sorting uses all returned rows." label="Associated gene-search samples help" /></span>
         <button type="button" class="gsc-dl-btn" title="Download all results as CSV" @click="downloadTableCsv"><el-icon><Download /></el-icon><span>Download</span></button>
       </div>
 

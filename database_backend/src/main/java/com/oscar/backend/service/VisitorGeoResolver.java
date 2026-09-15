@@ -1,5 +1,7 @@
 package com.oscar.backend.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.maxmind.geoip2.DatabaseReader;
 import com.maxmind.geoip2.exception.GeoIp2Exception;
 import com.maxmind.geoip2.model.CityResponse;
@@ -11,8 +13,7 @@ import org.springframework.stereotype.Component;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.time.Duration;
 
 /**
  * Resolves IP addresses to geographic coordinates using a local
@@ -22,15 +23,19 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>No network access is required after the database file is downloaded and
  * placed at the configured path ({@code oscar.geoip.database-path}).</p>
  *
- * <p>Results are cached indefinitely.  Private / reserved IPs are skipped.</p>
+ * <p>Successful lookups are kept in a bounded 24-hour idle cache. Private and reserved IPs are skipped.</p>
  */
 @Component
 public class VisitorGeoResolver {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(VisitorGeoResolver.class);
+    private static final long MAX_CACHE_SIZE = 20_000L;
 
     private final DatabaseReader reader;
-    private final Map<String, GeoResult> cache = new ConcurrentHashMap<>();
+    private final Cache<String, GeoResult> cache = Caffeine.newBuilder()
+            .maximumSize(MAX_CACHE_SIZE)
+            .expireAfterAccess(Duration.ofHours(24))
+            .build();
 
     public VisitorGeoResolver(@Value("${oscar.geoip.database-path}") String databasePath) throws IOException {
         File dbFile = new File(databasePath);
@@ -58,7 +63,7 @@ public class VisitorGeoResolver {
     public GeoResult resolve(String ip) {
         if (reader == null || ip == null || ip.isBlank()) return null;
 
-        return cache.computeIfAbsent(ip, this::lookup);
+        return cache.get(ip, this::lookup);
     }
 
     private GeoResult lookup(String ip) {

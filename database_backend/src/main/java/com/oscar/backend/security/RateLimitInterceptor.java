@@ -1,5 +1,6 @@
 package com.oscar.backend.security;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -10,7 +11,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Two-tier IP-based rate limiter with abuse ban.
@@ -28,11 +29,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RateLimitInterceptor implements HandlerInterceptor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RateLimitInterceptor.class);
+    private static final long MAX_TRACKED_IPS = 10_000L;
 
     // ---- soft limit ----
     private final long windowMillis;
     private final int maxRequestsPerWindow;
-    private final Map<String, Deque<Long>> windowByIp = new ConcurrentHashMap<>();
+    private final Map<String, Deque<Long>> windowByIp;
 
     // ---- abuse detection ----
     private final int abuseThreshold;
@@ -40,8 +42,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     // ---- ban ----
     private final long banDurationMillis;
-    private final Map<String, Long> bannedUntilByIp = new ConcurrentHashMap<>();
-    private final Map<String, Deque<Long>> violationTimestampsByIp = new ConcurrentHashMap<>();
+    private final Map<String, Long> bannedUntilByIp;
+    private final Map<String, Deque<Long>> violationTimestampsByIp;
 
     public RateLimitInterceptor(
             int windowSeconds,
@@ -55,6 +57,17 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         this.abuseThreshold = abuseThreshold;
         this.abuseWindowMillis = abuseWindowSeconds * 1_000L;
         this.banDurationMillis = banDurationSeconds * 1_000L;
+        this.windowByIp = boundedIpMap(Math.max(this.windowMillis, 60_000L));
+        this.violationTimestampsByIp = boundedIpMap(Math.max(this.abuseWindowMillis, 60_000L));
+        this.bannedUntilByIp = boundedIpMap(Math.max(this.banDurationMillis, 60_000L));
+    }
+
+    private <T> Map<String, T> boundedIpMap(long idleMillis) {
+        return Caffeine.newBuilder()
+                .maximumSize(MAX_TRACKED_IPS)
+                .expireAfterAccess(idleMillis, TimeUnit.MILLISECONDS)
+                .<String, T>build()
+                .asMap();
     }
 
     @Override

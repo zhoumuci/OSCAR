@@ -63,7 +63,7 @@ public class SearchResultServiceImpl implements SearchResultService {
     // ===================================================================
 
     @Override
-    @org.springframework.cache.annotation.Cacheable(value = "sampleOverview", key = "#datasetId")
+    @org.springframework.cache.annotation.Cacheable(value = "sampleOverview", key = "#datasetId", sync = true)
     public SearchResultOverviewResponse getOverview(String datasetId) {
         String id = normalizeRequiredDatasetId(datasetId);
         SearchResultOverviewResponse overview = searchResultMapper.selectOverviewByDatasetId(id);
@@ -72,7 +72,7 @@ public class SearchResultServiceImpl implements SearchResultService {
     }
 
     @Override
-    @org.springframework.cache.annotation.Cacheable(value = "cellTypeComposition", key = "#datasetId + ':' + #domain")
+    @org.springframework.cache.annotation.Cacheable(value = "cellTypeComposition", key = "#datasetId + ':' + #domain", sync = true)
     public SearchResultCellTypeCompositionResponse getCellTypeComposition(
             String datasetId, String domain, String groupBy) {
         String normalizedId = normalizeRequiredDatasetId(datasetId);
@@ -86,7 +86,7 @@ public class SearchResultServiceImpl implements SearchResultService {
     }
 
     @Override
-    @org.springframework.cache.annotation.Cacheable(value = "qcViolin", key = "#datasetId + ':' + #domain + ':' + #groupBy + ':' + #metrics")
+    @org.springframework.cache.annotation.Cacheable(value = "qcViolin", key = "#datasetId + ':' + #domain + ':' + #groupBy + ':' + #metrics", sync = true)
     public SearchResultQcViolinResponse getQcViolin(
             String datasetId, String domain, String groupBy, String metrics) {
         String normalizedId = normalizeRequiredDatasetId(datasetId);
@@ -104,7 +104,7 @@ public class SearchResultServiceImpl implements SearchResultService {
     }
 
     @Override
-    @org.springframework.cache.annotation.Cacheable(value = "umapData", key = "#datasetId + ':' + #domain + ':' + #embedding + ':' + #colorBy + ':' + #maxPoints")
+    @org.springframework.cache.annotation.Cacheable(value = "umapData", key = "#datasetId + ':' + #domain + ':' + #embedding + ':' + #colorBy + ':' + #maxPoints", sync = true)
     public SearchResultUmapResponse getUmap(
             String datasetId, String domain, String embedding, String colorBy, Integer maxPoints) {
         String normalizedId = normalizeRequiredDatasetId(datasetId);

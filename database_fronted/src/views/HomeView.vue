@@ -145,7 +145,7 @@
             <div class="ochart-title">Tissue coverage
               <el-tooltip placement="top" effect="light" :show-after="200">
                 <template #content>
-                  <div><div>Shows the 12 tissues with the largest number of OSCAR samples.</div><div>Bar length represents sample count; hover over a bar to see its sample, cell, and dataset totals.</div></div>
+                  <div>The 12 tissues with the most OSCAR samples; bar length is the sample count.</div>
                 </template>
                 <span class="ochart-help">?</span>
               </el-tooltip>

@@ -59,6 +59,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 const CONTACT_EMAIL = "lcqbio@163.com";
+const CARTO_BASEMAP_KEY = import.meta.env.VITE_CARTO_BASEMAP_KEY?.trim() ?? "";
 
 const mapEl = ref<HTMLDivElement | null>(null);
 let contactMap: L.Map | null = null;
@@ -80,12 +81,16 @@ onMounted(() => {
     center: [lat, lng],
     zoom: 15,
     zoomControl: true,
-    attributionControl: false,
+    attributionControl: true,
   });
 
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-    maxZoom: 18,
-    subdomains: ['a', 'b', 'c', 'd'],
+  const cartoTileUrl = `https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png?key=${encodeURIComponent(CARTO_BASEMAP_KEY)}`;
+
+  L.tileLayer(cartoTileUrl, {
+    maxZoom: 20,
+    subdomains: "abcd",
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
   }).addTo(contactMap);
 
   L.marker([lat, lng])

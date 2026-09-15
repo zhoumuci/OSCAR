@@ -58,7 +58,7 @@ CCR7"
           </button>
           <el-tooltip placement="top" effect="light" :show-after="200">
             <template #content>
-              <div><div>Accepted files: .txt, .csv, and .tsv.</div><div>The parser reads a recognised gene column when one is present; otherwise it reads gene symbols from the text cells. Duplicate symbols are removed.</div></div>
+              <div>Accepts .txt, .csv, or .tsv files containing gene symbols; duplicate symbols are removed.</div>
             </template>
             <span class="cte-button-help-icon" role="button" tabindex="0" aria-label="Upload file help">?</span>
           </el-tooltip>
@@ -68,7 +68,7 @@ CCR7"
             <span>📋</span> Load example
           </button>
           <el-tooltip placement="top" effect="light" :show-after="200">
-            <template #content><div class="cte-result-level-help">Loads a 20-gene cardiomyocyte example and selects its Heart reference dataset when that dataset is available.</div></template>
+            <template #content><div class="cte-result-level-help">Loads a cardiomyocyte gene set and selects its Heart reference dataset when available.</div></template>
             <span class="cte-button-help-icon" role="button" tabindex="0" aria-label="Load example help">?</span>
           </el-tooltip>
         </span>
@@ -77,7 +77,7 @@ CCR7"
             <span>✕</span> Clear
           </button>
           <el-tooltip placement="top" effect="light" :show-after="200">
-            <template #content><div class="cte-result-level-help">Removes every gene from the input box. Existing results are cleared because they no longer match the current input.</div></template>
+            <template #content><div class="cte-result-level-help">Clears the gene input and its current results.</div></template>
             <span class="cte-button-help-icon" role="button" tabindex="0" aria-label="Clear input help">?</span>
           </el-tooltip>
         </span>
@@ -87,7 +87,7 @@ CCR7"
         <div class="stat-item stat-item--muted">
           <span class="stat-label">Input genes</span>
             <el-tooltip placement="top" effect="light" :show-after="200">
-              <template #content><div class="cte-result-level-help">Number of valid, unique gene symbols currently parsed from the input. This value updates before the analysis runs.</div></template>
+              <template #content><div class="cte-result-level-help">Number of unique valid gene symbols in the input.</div></template>
               <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Input genes help">?</span>
             </el-tooltip>
           <span class="stat-value">{{ inputGeneCount }}</span>
@@ -95,7 +95,7 @@ CCR7"
         <div class="stat-item">
           <span class="stat-label">Matched genes</span>
             <el-tooltip placement="top" effect="light" :show-after="200">
-              <template #content><div class="cte-result-level-help">Input genes found in the marker-gene universe of the selected OSCAR dataset. A dash is shown until an analysis has completed.</div></template>
+              <template #content><div class="cte-result-level-help">Input genes found in the selected dataset's marker-gene universe.</div></template>
               <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Matched genes help">?</span>
             </el-tooltip>
           <span class="stat-value">{{ matchedGeneCount }}</span>
@@ -103,7 +103,7 @@ CCR7"
         <div class="stat-item stat-item--bad">
           <span class="stat-label">Unmatched genes</span>
             <el-tooltip placement="top" effect="light" :show-after="200">
-              <template #content><div class="cte-result-level-help">Valid input genes not found in the selected dataset's marker-gene universe. A dash means the analysis has not run or no unmatched genes were found.</div></template>
+              <template #content><div class="cte-result-level-help">Valid input genes absent from the selected dataset's marker-gene universe.</div></template>
               <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Unmatched genes help">?</span>
             </el-tooltip>
           <span class="stat-value stat-value--muted">{{ unmatchedGeneCount }}</span>
@@ -123,7 +123,7 @@ CCR7"
                 <span class="cte-field-label cte-field-label--help">
                   <span>Tissue <em>required</em></span>
                   <el-tooltip placement="top" effect="light" :show-after="200">
-                    <template #content><div class="cte-result-level-help">Selects the biological tissue and limits the Dataset list to OSCAR samples available for cell-type enrichment in that tissue.</div></template>
+                    <template #content><div class="cte-result-level-help">Limits the dataset list to samples from the selected tissue.</div></template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Tissue help">?</span>
                   </el-tooltip>
                 </span>
@@ -146,7 +146,7 @@ CCR7"
                 <span class="cte-field-label cte-field-label--help">
                   <span>Dataset <em>required</em></span>
                   <el-tooltip placement="top" effect="light" :show-after="200">
-                    <template #content><div class="cte-result-level-help">Chooses the single OSCAR dataset whose integration expression marker genes define both the tested groups and the background universe.</div></template>
+                    <template #content><div class="cte-result-level-help">Selects the dataset whose integration expression markers define the tested groups and gene universe.</div></template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Dataset help">?</span>
                   </el-tooltip>
                 </span>
@@ -179,11 +179,7 @@ CCR7"
                     :show-after="200"
                   >
                     <template #content>
-                      <div class="cte-result-level-help">
-                        <div v-for="line in resultLevelHelpLines" :key="line.label">
-                          <strong>{{ line.label }}:</strong> {{ line.text }}
-                        </div>
-                      </div>
+                      <div class="cte-result-level-help">{{ resultLevelHelp }}</div>
                     </template>
                     <span
                       class="cte-inline-help-icon"
@@ -228,7 +224,7 @@ CCR7"
                 <span class="cte-field-label cte-field-label--help">
                   <span>Marker reference</span>
                   <el-tooltip placement="top" effect="light" :show-after="200">
-                    <template #content><div class="cte-result-level-help">Uses integration-domain gene-expression markers from the selected dataset as the reference. Gene activity score markers are not mixed into this analysis.</div></template>
+                    <template #content><div class="cte-result-level-help">Uses integration-domain gene-expression markers from the selected dataset.</div></template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Marker reference help">?</span>
                   </el-tooltip>
                 </span>
@@ -247,7 +243,7 @@ CCR7"
                 <span class="cte-field-label cte-field-label--help">
                   <span>Minimum overlap</span>
                   <el-tooltip placement="top" effect="light" :show-after="200">
-                    <template #content><div class="cte-result-level-help">Minimum number of matched input genes that a cell type or cluster must share with its marker set to be included in the returned results.</div></template>
+                    <template #content><div class="cte-result-level-help">Minimum shared input genes required to return a cell type or cluster.</div></template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Minimum overlap help">?</span>
                   </el-tooltip>
                 </span>
@@ -265,7 +261,7 @@ CCR7"
                 <span class="cte-field-label cte-field-label--help">
                   <span>FDR method</span>
                   <el-tooltip placement="top" effect="light" :show-after="200">
-                    <template #content><div class="cte-result-level-help">Benjamini-Hochberg correction is applied across all tested marker sets in the selected dataset. Results with FDR ≤ 0.05 are counted as significant.</div></template>
+                    <template #content><div class="cte-result-level-help">Benjamini-Hochberg correction across all tested marker sets; FDR ≤ 0.05 is significant.</div></template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="FDR method help">?</span>
                   </el-tooltip>
                 </span>
@@ -295,14 +291,14 @@ CCR7"
               {{ loading ? "Running…" : "Run enrichment" }}
             </button>
             <el-tooltip placement="top" effect="light" :show-after="200">
-              <template #content><div class="cte-result-level-help">Runs a hypergeometric enrichment test for the selected result level, then applies BH multiple-testing correction and ranks the returned groups by FDR.</div></template>
+              <template #content><div class="cte-result-level-help">Runs hypergeometric enrichment and ranks BH-adjusted results by FDR.</div></template>
               <span class="cte-button-help-icon" role="button" tabindex="0" aria-label="Run enrichment help">?</span>
             </el-tooltip>
           </span>
           <span class="cte-button-help-wrap">
             <button type="button" class="soft-btn" :disabled="loading" @click="resetAll">Reset</button>
             <el-tooltip placement="top" effect="light" :show-after="200">
-              <template #content><div class="cte-result-level-help">Restores all inputs and settings to their defaults and removes the current enrichment results.</div></template>
+              <template #content><div class="cte-result-level-help">Restores default settings and clears the input and results.</div></template>
               <span class="cte-button-help-icon" role="button" tabindex="0" aria-label="Reset analysis help">?</span>
             </el-tooltip>
           </span>
@@ -386,7 +382,7 @@ CCR7"
           <span class="sum-num">{{ enrichmentResults.inputGenes?.length ?? 0 }}</span>
           <span class="sum-label">Input genes</span>
             <el-tooltip placement="top" effect="light" :show-after="200">
-              <template #content><div class="cte-result-level-help">Number of valid, unique gene symbols submitted in this completed analysis.</div></template>
+              <template #content><div class="cte-result-level-help">Unique valid genes submitted in this analysis.</div></template>
               <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Result input genes help">?</span>
             </el-tooltip>
         </div>
@@ -394,7 +390,7 @@ CCR7"
           <span class="sum-num">{{ enrichmentResults.matchedGenes?.length ?? 0 }}</span>
           <span class="sum-label">Matched genes</span>
             <el-tooltip placement="top" effect="light" :show-after="200">
-              <template #content><div class="cte-result-level-help">Number of submitted genes found in at least one integration expression marker set in the selected dataset.</div></template>
+              <template #content><div class="cte-result-level-help">Submitted genes found in at least one reference marker set.</div></template>
               <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Result matched genes help">?</span>
             </el-tooltip>
         </div>
@@ -402,7 +398,7 @@ CCR7"
           <span class="sum-num">{{ enrichmentResults.significantResults ?? 0 }}</span>
           <span class="sum-label">Significant results</span>
             <el-tooltip placement="top" effect="light" :show-after="200">
-              <template #content><div class="cte-result-level-help">Number of returned cell types or clusters with Benjamini-Hochberg adjusted FDR ≤ 0.05.</div></template>
+              <template #content><div class="cte-result-level-help">Returned cell types or clusters with BH-adjusted FDR ≤ 0.05.</div></template>
               <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Significant results help">?</span>
             </el-tooltip>
         </div>
@@ -410,7 +406,7 @@ CCR7"
           <span class="sum-num sum-num--sm">{{ topEnrichedLabel }}</span>
           <span class="sum-label">{{ topEnrichedSummaryLabel }}</span>
             <el-tooltip placement="top" effect="light" :show-after="200">
-              <template #content><div class="cte-result-level-help">Highest-ranked returned group after sorting by FDR, then P value, enrichment fold, and overlap. It is not selected by gene count alone.</div></template>
+              <template #content><div class="cte-result-level-help">Best result by FDR, then P value, enrichment fold, and overlap.</div></template>
               <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Top enriched result help">?</span>
             </el-tooltip>
         </div>
@@ -459,7 +455,7 @@ CCR7"
             <div class="cte-overview-panel">
               <div class="cte-chart-title cte-chart-title--help">
                 <span>{{ overviewTitle }}</span>
-                <HelpTooltip text="Shows up to the top 8 results ranked by FDR, with the lowest FDR first. Bar values are −log10(FDR), so a larger value and longer bar indicate stronger enrichment significance." :label="`${overviewTitle} help`" />
+                <HelpTooltip text="Top eight results by FDR; longer bars represent larger −log10(FDR) values." :label="`${overviewTitle} help`" />
               </div>
               <div v-if="topOverviewRows.length === 0" class="cte-empty-state">No enrichment results found.</div>
               <div v-else class="cte-bar-list">
@@ -699,10 +695,7 @@ const resultLevel = ref<EnrichmentResultLevel>("cell_type");
 const displayedResultLevel = ref<EnrichmentResultLevel>("cell_type");
 const markerReference = ref<"integration_expression">("integration_expression");
 
-const resultLevelHelpLines = [
-  { label: "Cell type", text: "Within the selected dataset, combines marker genes from clusters that share the same standardised cell-type name, then runs one enrichment test for each cell type." },
-  { label: "Cluster", text: "Tests each cluster in the selected dataset separately. Results are uniquely identified by dataset and cluster, with the standardised cell type shown beside the cluster." },
-];
+const resultLevelHelp = "Cell type combines clusters sharing a standardized cell-type label; Cluster tests each dataset cluster separately.";
 
 // ===========================================================================
 // Reactive state — settings (advanced, collapsed by default)

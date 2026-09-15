@@ -14,7 +14,7 @@
             <span>DNA sequence input
               <span class="spg-max-help-wrap">
                 <span class="cte-max-badge">MAX input: 20 kb</span>
-                <el-tooltip content="Enter one human DNA sequence in plain text or FASTA format. Whitespace and a single FASTA header are removed before validation; the cleaned sequence may contain A, C, G, T, or N and cannot exceed 20 kb." placement="top" effect="light" :show-after="200">
+                <el-tooltip content="Enter one DNA sequence up to 20 kb in plain text or FASTA format using A, C, G, T, or N." placement="top" effect="light" :show-after="200">
                   <span class="spg-help-icon" role="button" tabindex="0" aria-label="DNA sequence input help">?</span>
                 </el-tooltip>
               </span>
@@ -51,10 +51,7 @@
               </button>
               <el-tooltip placement="top" effect="light" :show-after="200">
                 <template #content>
-                  <span class="spg-field-help">
-                    <span>Accepted files: .fasta, .fa, and .txt.</span>
-                    <span>The file may contain one plain DNA sequence or one FASTA record. Spaces and line breaks are ignored.</span>
-                  </span>
+                  <span class="spg-field-help">Accepts .fasta, .fa, or .txt files containing one DNA sequence; whitespace is ignored.</span>
                 </template>
                 <span class="spg-help-icon">?</span>
               </el-tooltip>
@@ -81,22 +78,22 @@
             <div class="spg-qc-card spg-qc-card--muted">
               <span class="spg-qc-label">Sequence length</span>
               <span class="spg-qc-val">{{ seqStats.length }} bp</span>
-              <el-tooltip placement="top" effect="light" :show-after="200"><template #content><span class="spg-field-help"><span>Total bases after spaces and FASTA headers are removed.</span><span>A, C, G, T, and N are all included in this number.</span></span></template><span class="spg-qc-help">?</span></el-tooltip>
+              <el-tooltip placement="top" effect="light" :show-after="200"><template #content><span class="spg-field-help">Total A, C, G, T, and N bases after removing whitespace and the FASTA header.</span></template><span class="spg-qc-help">?</span></el-tooltip>
             </div>
             <div class="spg-qc-card">
               <span class="spg-qc-label">Valid bases</span>
               <span class="spg-qc-val">{{ seqStats.valid }}</span>
-              <el-tooltip placement="top" effect="light" :show-after="200"><template #content><span class="spg-field-help"><span>Number of A, C, G, and T bases.</span><span>N bases are not counted here because their exact base is unknown.</span></span></template><span class="spg-qc-help">?</span></el-tooltip>
+              <el-tooltip placement="top" effect="light" :show-after="200"><template #content><span class="spg-field-help">Number of A, C, G, and T bases; N is excluded.</span></template><span class="spg-qc-help">?</span></el-tooltip>
             </div>
             <div class="spg-qc-card spg-qc-card--info">
               <span class="spg-qc-label">GC content</span>
               <span class="spg-qc-val">{{ seqStats.gcPct }}%</span>
-              <el-tooltip placement="top" effect="light" :show-after="200"><template #content><span class="spg-field-help"><span>Percentage of G and C among A, C, G, and T bases.</span><span>N bases are excluded from this calculation.</span></span></template><span class="spg-qc-help">?</span></el-tooltip>
+              <el-tooltip placement="top" effect="light" :show-after="200"><template #content><span class="spg-field-help">Percentage of G and C among known bases; N is excluded.</span></template><span class="spg-qc-help">?</span></el-tooltip>
             </div>
             <div class="spg-qc-card spg-qc-card--bad">
               <span class="spg-qc-label">Ambiguous bases</span>
               <span class="spg-qc-val">{{ seqStats.ambig }}</span>
-              <el-tooltip placement="top" effect="light" :show-after="200"><template #content><span class="spg-field-help"><span>Number of N bases whose exact identity is unknown.</span><span>Other unsupported characters are rejected before the analysis can run.</span></span></template><span class="spg-qc-help">?</span></el-tooltip>
+              <el-tooltip placement="top" effect="light" :show-after="200"><template #content><span class="spg-field-help">Number of N bases with unknown identity.</span></template><span class="spg-qc-help">?</span></el-tooltip>
             </div>
           </div>
         </section>
@@ -111,7 +108,7 @@
             <div class="cte-fields">
               <label class="cte-field">
                 <span class="cte-field-label cte-field-label--help">Genome build
-                  <el-tooltip content="BLAST maps the input sequence to the human hg38 reference genome. This value is fixed so every returned region and OSCAR peak uses the same coordinate system." placement="top-start" effect="light" :show-after="200"><span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Genome build help">?</span></el-tooltip>
+                  <el-tooltip content="BLAST and OSCAR results use human genome build hg38." placement="top-start" effect="light" :show-after="200"><span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Genome build help">?</span></el-tooltip>
                 </span>
                 <el-select v-model="genomeBuild" class="cte-select" popper-class="oscar-select-popper" size="small" disabled>
                   <el-option label="hg38" value="hg38" />
@@ -120,7 +117,7 @@
 
               <label class="cte-field">
                 <span class="cte-field-label cte-field-label--help">Reference scope
-                  <el-tooltip placement="top-start" effect="light" :show-after="200"><template #content><span class="spg-field-help"><span>This setting does not change the BLAST mapping. It controls where OSCAR evidence is searched after a genomic region is selected.</span><span><strong>All OSCAR datasets:</strong> search regulatory evidence in every dataset.</span><span><strong>Single OSCAR dataset:</strong> search only the dataset selected in the popup.</span></span></template><span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Reference scope help">?</span></el-tooltip>
+                  <el-tooltip placement="top-start" effect="light" :show-after="200"><template #content><span class="spg-field-help">Search OSCAR evidence across all datasets or restrict it to one dataset; BLAST mapping is unchanged.</span></template><span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Reference scope help">?</span></el-tooltip>
                 </span>
                 <div class="cte-ref-scope-row">
                   <el-select v-model="referenceScope" class="cte-select" popper-class="oscar-select-popper" size="small" :disabled="loading" @change="onReferenceScopeChange">
@@ -139,12 +136,7 @@
                   Show results
                   <el-tooltip placement="top-start" effect="light" :show-after="200">
                     <template #content>
-                      <span class="spg-field-help">
-                        <span>Controls which OSCAR records are retrieved after BLAST selects an hg38 region.</span>
-                        <span><strong>Peak-to-gene links:</strong> return stored P2G links whose peak overlaps the selected region.</span>
-                        <span><strong>Marker peaks:</strong> return marker peaks that overlap the selected region and show linked genes when available.</span>
-                        <span><strong>Both:</strong> return both types and display them in separate result tables.</span>
-                      </span>
+                      <span class="spg-field-help">Choose P2G links, marker peaks, or both for the selected BLAST region.</span>
                     </template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Show results help">?</span>
                   </el-tooltip>
@@ -176,13 +168,7 @@
                   BLAST task
                   <el-tooltip placement="top-start" effect="light" :show-after="200">
                     <template #content>
-                      <span class="spg-field-help">
-                        <span>Chooses the BLAST search algorithm.</span>
-                        <span><strong>Auto:</strong> uses blastn-short for sequences up to 50 bases. Longer sequences use megablast first and retry with blastn only if no match is found.</span>
-                        <span><strong>megablast:</strong> fast and suitable for long sequences expected to closely match hg38.</span>
-                        <span><strong>blastn:</strong> slower but more sensitive to mismatches or partial similarity.</span>
-                        <span><strong>blastn-short:</strong> tuned for short nucleotide sequences.</span>
-                      </span>
+                      <span class="spg-field-help">Auto selects a task by sequence length; megablast favors close matches, blastn is more sensitive, and blastn-short is tuned for short sequences.</span>
                     </template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="BLAST task help">?</span>
                   </el-tooltip>
@@ -199,11 +185,7 @@
                   Max target sequences
                   <el-tooltip placement="top-start" effect="light" :show-after="200">
                     <template #content>
-                      <span class="spg-field-help">
-                        <span>Limits the number of BLAST reference subjects considered, such as chromosomes or contigs.</span>
-                        <span>It is not a direct limit on final genomic regions because one subject can contain several alignments.</span>
-                        <span>A larger value can find more alternative loci but may take longer.</span>
-                      </span>
+                      <span class="spg-field-help">Maximum BLAST reference subjects retained; larger values may keep more alternative loci.</span>
                     </template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Max target sequences help">?</span>
                   </el-tooltip>
@@ -215,10 +197,7 @@
                   Max HSPs per target
                   <el-tooltip placement="top-start" effect="light" :show-after="200">
                     <template #content>
-                      <span class="spg-field-help">
-                        <span>Limits how many alignment segments are kept for each BLAST reference subject.</span>
-                        <span>A larger value preserves more possible loci, which helps detect ambiguous mapping, but increases processing time.</span>
-                      </span>
+                      <span class="spg-field-help">Maximum alignment segments retained per BLAST subject.</span>
                     </template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Max HSPs per target help">?</span>
                   </el-tooltip>
@@ -230,10 +209,7 @@
                   E-value cutoff
                   <el-tooltip placement="top-start" effect="light" :show-after="200">
                     <template #content>
-                      <span class="spg-field-help">
-                        <span>Largest BLAST E-value that will be accepted.</span>
-                        <span>A smaller cutoff is stricter and keeps only stronger sequence matches; a larger cutoff allows weaker matches.</span>
-                      </span>
+                      <span class="spg-field-help">Largest accepted BLAST E-value; smaller cutoffs are stricter.</span>
                     </template>
                     <span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="E-value cutoff help">?</span>
                   </el-tooltip>
@@ -242,13 +218,13 @@
               </div>
               <label class="cte-field">
                 <span class="cte-field-label cte-field-label--help">Flanking region (bp)
-                  <el-tooltip content="After BLAST selects an hg38 region, this number of bases is added to both its start and end before OSCAR peaks are searched. It does not change the BLAST alignment. Use 0 to search only the aligned region." placement="top-start" effect="light" :show-after="200"><span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Flanking region help">?</span></el-tooltip>
+                  <el-tooltip content="Bases added to each side of the selected BLAST interval before searching OSCAR peaks." placement="top-start" effect="light" :show-after="200"><span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Flanking region help">?</span></el-tooltip>
                 </span>
                 <el-input-number v-model="flankBp" class="cte-number" size="small" :min="0" :max="1000000" :disabled="loading" />
               </label>
               <label class="cte-field">
                 <span class="cte-field-label cte-field-label--help">Maximum returned records
-                  <el-tooltip content="Limits the number of OSCAR evidence rows returned for each selected result query. It does not limit BLAST candidates. Leave it empty to return all matching evidence; using a limit can make a result table incomplete." placement="top-start" effect="light" :show-after="200"><span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Maximum returned records help">?</span></el-tooltip>
+                  <el-tooltip content="Maximum OSCAR evidence rows returned for the selected BLAST region; leave blank for all matches." placement="top-start" effect="light" :show-after="200"><span class="cte-inline-help-icon" role="button" tabindex="0" aria-label="Maximum returned records help">?</span></el-tooltip>
                 </span>
                 <el-input-number v-model="resultLimit" class="cte-number" size="small" :min="1" placeholder="All" :disabled="loading" />
                 <small class="cte-field-hint">Leave empty to return all matched results.</small>
@@ -466,7 +442,7 @@
           <table class="cte-table">
             <thead><tr>
               <th class="gsc-sort-th" @click="toggleSort('datasetId')"><span class="spg-th-label"><span>Dataset</span><HelpTooltip text="OSCAR dataset containing this marker peak." label="Dataset column help" /><span class="gsc-sort-arrow">{{ sortArrow('datasetId') }}</span></span></th>
-              <th><span class="spg-th-label"><span>Domain</span><HelpTooltip text="Marker-analysis domain used for this peak, such as gene expression or gene score." label="Domain column help" /></span></th>
+              <th><span class="spg-th-label"><span>Domain</span><HelpTooltip text="OSCAR data domain assigned to this marker-peak record." label="Domain column help" /></span></th>
               <th class="gsc-sort-th" @click="toggleSort('groupName')"><span class="spg-th-label"><span>Cluster</span><HelpTooltip text="Cell cluster for which this peak is a marker." label="Cluster column help" /><span class="gsc-sort-arrow">{{ sortArrow('groupName') }}</span></span></th>
               <th><span class="spg-th-label"><span>Peak region</span><HelpTooltip text="hg38 coordinates of the marker peak." label="Peak region column help" /></span></th>
               <th class="gsc-sort-th" @click="toggleSort('linkedGenes')"><span class="spg-th-label"><span>Linked genes</span><HelpTooltip text="Genes linked to this marker peak in OSCAR, when available." label="Linked genes column help" /><span class="gsc-sort-arrow">{{ sortArrow('linkedGenes') }}</span></span></th>
@@ -517,7 +493,7 @@
 
 <script setup lang="ts">
 const baseUrl = import.meta.env.BASE_URL;
-import { computed, onBeforeUnmount, onDeactivated, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onDeactivated, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 const router = useRouter();
 import HelpTooltip from "@/components/analysis/AnalysisHelpTooltip.vue";
@@ -525,6 +501,7 @@ import {
   fetchAllDatasets,
   fetchSequencePeak2GeneEvidence,
   fetchSequencePeak2GeneJob,
+  releaseSequencePeak2GeneJob,
   submitSequencePeak2GeneJob,
 } from "@/api/analysis";
 import type {
@@ -590,13 +567,13 @@ const resultTabs = computed(() => {
     { key: "blastHits", label: "Mapped genomic regions", help: "Shows the hg38 regions found by BLAST. Select a row to use that region for the other result tabs." },
   ];
   if (requestedContent === "all") {
-    tabs.push({ key: "allPeaks", label: "All overlapping peaks", help: "This is the combined view of the Peak-to-gene links and Marker peaks tables. Peaks with the same hg38 coordinates are merged into one row. Their dataset IDs and linked genes are combined; FDR shows the smallest available value and Link score shows the largest. Source shows P2G, Marker, or Both." });
+    tabs.push({ key: "allPeaks", label: "All overlapping peaks", help: "Merged view of P2G and marker peaks by hg38 interval, with combined datasets and genes." });
   }
   if (requestedContent === "all" || requestedContent === "peak_to_gene") {
-    tabs.push({ key: "p2g", label: "Peak-to-gene links", help: "Shows the individual OSCAR P2G links whose peaks overlap the selected mapped region. These peak coordinates are included in All overlapping peaks." });
+    tabs.push({ key: "p2g", label: "Peak-to-gene links", help: "OSCAR P2G links whose peaks overlap the selected mapped region." });
   }
   if (requestedContent === "all" || requestedContent === "marker_peaks") {
-    tabs.push({ key: "markerPeaks", label: "Marker peaks", help: "Shows the individual integration-domain marker peaks that overlap the selected mapped region. These peak coordinates are included in All overlapping peaks." });
+    tabs.push({ key: "markerPeaks", label: "Marker peaks", help: "Integration marker peaks overlapping the selected mapped region." });
   }
   return tabs;
 });
@@ -943,6 +920,8 @@ async function runMapping() {
     progressStage.value = "COMPLETED";
     hasResults.value = true;
     activeTab.value = "blastHits";
+    await nextTick();
+    void releaseSequencePeak2GeneJob(submitted.jobId).catch(() => undefined);
   } catch (e: any) {
     progressStage.value = "FAILED";
     progressMessage.value = e?.response?.data?.detail

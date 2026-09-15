@@ -155,15 +155,15 @@
             </div>
             <el-table :data="intersectRecords" stripe border class="detail-table fd-ra-overlap-table" size="small" v-loading="intersectLoading" element-loading-text="This operation may take a while — thank you for your patience." empty-text="No epi(genetic) annotation overlaps found">
               <el-table-column v-if="showQueryEnhancerColumns" min-width="200">
-                <template #header><span class="fd-col-header">{{ enhancerRegionLabel }} <el-tooltip placement="top" effect="light" :show-after="200"><template #content><div><div v-for="line in enhancerRegionTooltipLines" :key="line">{{ line }}</div></div></template><span class="fd-col-help">?</span></el-tooltip></span></template>
+                <template #header><span class="fd-col-header">{{ enhancerRegionLabel }} <el-tooltip placement="top" effect="light" :show-after="200"><template #content><div>{{ enhancerRegionTooltip }}</div></template><span class="fd-col-help">?</span></el-tooltip></span></template>
                 <template #default="{ row }"><span class="fd-mono" :title="getQueryEnhancerRegion(row)">{{ getQueryEnhancerRegion(row) }}</span></template>
               </el-table-column>
               <el-table-column v-if="showQueryEnhancerColumns" min-width="150">
-                <template #header><span class="fd-col-header">Cell type <el-tooltip placement="top" effect="light" :show-after="200"><template #content><div><div>This is the tissue or cell label stored with the enhancer-to-gene record.</div><div>It describes the enhancer source and is not taken from the selected comparison track.</div></div></template><span class="fd-col-help">?</span></el-tooltip></span></template>
+                <template #header><span class="fd-col-header">Cell type <el-tooltip placement="top" effect="light" :show-after="200"><template #content><div>Cell or tissue label stored with the enhancer-to-gene record.</div></template><span class="fd-col-help">?</span></el-tooltip></span></template>
                 <template #default="{ row }"><span :title="getCellType(row)">{{ getCellType(row) }}</span></template>
               </el-table-column>
               <el-table-column min-width="190">
-                <template #header><span class="fd-col-header">Reference match <el-tooltip placement="top" effect="light" :show-after="200"><template #content><div><div>Genomic interval from the selected comparison track that overlaps the queried gene, promoter, enhancer, or peak region.</div><div>One row is shown for each returned overlap. Table pagination only changes the visible page and does not cut the downloaded result.</div></div></template><span class="fd-col-help">?</span></el-tooltip></span></template>
+                <template #header><span class="fd-col-header">Reference match <el-tooltip placement="top" effect="light" :show-after="200"><template #content><div>Interval from the selected reference track that overlaps the queried region.</div></template><span class="fd-col-help">?</span></el-tooltip></span></template>
                 <template #default="{ row }"><span class="fd-mono" :title="getLocation(row)">{{ getLocation(row) }}</span></template>
               </el-table-column>
               <el-table-column v-if="showFeatureColumn" :label="featureColumnLabel" min-width="150"><template #default="{ row }"><span :title="getFeature(row)">{{ getFeature(row) }}</span></template></el-table-column>
@@ -384,12 +384,12 @@ const overviewSubtitle = computed(() => isPeakDetail.value
   : "Marker gene occurrence landscape across OSCAR datasets and cell types.");
 
 const topDatasetsHelp = computed(() => isPeakDetail.value
-  ? "Datasets are ranked by the number of marker-peak records with exactly the displayed genomic coordinates in the selected data domain, summed across cell types and clusters. The ten highest counts are shown, with Dataset ID used to break ties. This identifies datasets in which this peak is most repeatedly reported as a marker; it does not rank expression, effect size, or statistical significance."
-  : "Datasets are ranked by the total number of marker-gene records for the displayed gene in the selected data domain, summed across cell types and clusters. The ten highest counts are shown, with Dataset ID used to break ties. This identifies datasets in which this gene is most repeatedly reported as a marker; it does not rank expression, effect size, or statistical significance.");
+  ? "For the displayed peak, marker-peak records with the same chromosome, start, and end coordinates are counted in each dataset across all cell types and clusters. Datasets are ranked by record count from highest to lowest; Dataset ID breaks ties, and the first 10 are shown. This chart highlights the datasets in which this peak is most frequently reported as a marker, helping users identify samples for follow-up. It does not rank chromatin accessibility, effect size, or statistical significance."
+  : "For the displayed gene, marker-gene record counts are summed in each dataset across all cell types and clusters. Datasets are ranked by the summed record count from highest to lowest; Dataset ID breaks ties, and the first 10 are shown. This chart highlights the datasets in which this gene is most frequently reported as a marker, helping users identify samples for follow-up. It does not rank gene expression, effect size, or statistical significance.");
 
 const topCellTypesHelp = computed(() => isPeakDetail.value
-  ? "Standardized major cell types are ranked by the total number of marker-peak records with exactly the displayed genomic coordinates, aggregated across matching datasets and clusters. The ten highest counts are shown; Unknown represents records without a mapped major cell type. This highlights the cell types in which this peak most frequently occurs as a marker, not its expression level or statistical significance."
-  : "Standardized major cell types are ranked by the total number of marker-gene records for the displayed gene, aggregated across matching datasets and clusters. The ten highest counts are shown; Unknown represents records without a mapped major cell type. This highlights the cell types in which this gene most frequently occurs as a marker, not its expression level or statistical significance.");
+  ? "For the displayed peak, marker-peak records with the same chromosome, start, and end coordinates are grouped by standardized major cell type across all datasets and clusters, then counted. Cell types are ranked by record count from highest to lowest; cell-type name breaks ties, and the first 10 are shown. ‘Unknown’ means that no major cell type was mapped. This chart shows the cell types in which the peak is most frequently reported as a marker, not its accessibility level, effect size, or statistical significance."
+  : "For the displayed gene, marker-gene record counts are summed by standardized major cell type across all datasets and clusters. Cell types are ranked by the summed record count from highest to lowest; cell-type name breaks ties, and the first 10 are shown. ‘Unknown’ means that no major cell type was mapped. This chart shows the cell types in which the gene is most frequently reported as a marker, not its expression level, effect size, or statistical significance.");
 
 /* ---- Overview data ---- */
 const occurrenceLoading = ref(false);
@@ -433,12 +433,9 @@ const hasAnnotationContext = computed(() => isPeakDetail.value ? !!region.value 
 const annotationContextMessage = computed(() => isPeakDetail.value ? "No genomic region was provided for epi(genetic) annotation." : "No gene symbol was provided for epi(genetic) annotation.");
 const showQueryEnhancerColumns = computed(() => !isPeakDetail.value && (selectedGeneRegMode.value === "super_enhancer" || selectedGeneRegMode.value === "typical_enhancer"));
 const enhancerRegionLabel = computed(() => selectedGeneRegMode.value === "super_enhancer" ? "Super Enhancer region" : "Typical Enhancer region");
-const enhancerRegionTooltipLines = computed(() => {
+const enhancerRegionTooltip = computed(() => {
   const type = selectedGeneRegMode.value === "super_enhancer" ? "super enhancer" : "typical enhancer";
-  return [
-    `A ${type} linked to this gene in the OSCAR enhancer-to-gene data. All returned enhancer regions are checked, not only the rows visible on the current table page.`,
-    "Each enhancer region is then compared with the selected annotation track by genomic overlap.",
-  ];
+  return `${type.charAt(0).toUpperCase()}${type.slice(1)} linked to this gene and tested for overlap with the selected reference track.`;
 });
 const showFeatureColumn = computed(() => activeAnnotationType.value !== "crispr" && !(isPeakDetail.value && activeAnnotationType.value === "enhancer"));
 
@@ -819,12 +816,29 @@ async function downloadOverlapCsv() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${mainTitle.value}_regulatory_annotation.csv`;
+    a.download = isPeakDetail.value
+      ? `${mainTitle.value}_regulatory_annotation.csv`
+      : buildGeneAnnotationFilename();
     a.click();
     URL.revokeObjectURL(url);
   } catch {
     /* silently ignore download errors */
   }
+}
+
+function buildGeneAnnotationFilename(): string {
+  const mode = filenameToken(selectedGeneRegMode.value || "unknown");
+  const annotationType = filenameToken(selectedGeneAnnotationType.value || "unknown");
+  return `gene_${mode}_${annotationType}_annotation_${localDownloadTimestamp()}.csv`;
+}
+
+function filenameToken(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "") || "unknown";
+}
+
+function localDownloadTimestamp(now = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
 function queryString(name:string):string{ const v=route.query[name]; return String(Array.isArray(v)?v[0]??"":v??"").trim(); }

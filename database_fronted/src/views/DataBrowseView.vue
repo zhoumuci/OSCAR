@@ -83,7 +83,7 @@
               class="tbl"
               @sort-change="onTableSortChange"
             >
-              <el-table-column prop="datasetId" label="DatasetID" min-width="150" fixed sortable="custom">
+              <el-table-column prop="datasetId" label="DatasetID" min-width="165" fixed sortable="custom">
                 <template #header>
                   <span class="browse-column-header">
                     <span>DatasetID</span>
@@ -105,7 +105,7 @@
                 </template>
               </el-table-column>
 
-              <el-table-column prop="sampleType" label="Sample Type" min-width="135" sortable="custom">
+              <el-table-column prop="sampleType" label="Sample Type" min-width="165" sortable="custom">
                 <template #header>
                   <span class="browse-column-header">
                     <span>Sample Type</span>
@@ -116,7 +116,7 @@
                   </span>
                 </template>
               </el-table-column>
-              <el-table-column prop="tissue" label="Tissue" min-width="105" sortable="custom">
+              <el-table-column prop="tissue" label="Tissue" min-width="125" sortable="custom">
                 <template #header>
                   <span class="browse-column-header">
                     <span>Tissue</span>
@@ -127,7 +127,7 @@
                   </span>
                 </template>
               </el-table-column>
-              <el-table-column prop="sampleName" label="Sample Name" min-width="180" sortable="custom">
+              <el-table-column prop="sampleName" label="Sample Name" min-width="205" sortable="custom">
                 <template #header>
                   <span class="browse-column-header">
                     <span>Sample Name</span>
@@ -138,7 +138,7 @@
                   </span>
                 </template>
               </el-table-column>
-              <el-table-column prop="cells" label="Cells" min-width="110" align="center" sortable="custom">
+              <el-table-column prop="cells" label="Cells" min-width="125" align="center" sortable="custom">
                 <template #header>
                   <span class="browse-column-header">
                     <span>Cells</span>
@@ -152,7 +152,7 @@
                   {{ formatCells(row.cells) }}
                 </template>
               </el-table-column>
-              <el-table-column prop="platform" label="Platform" min-width="130" sortable="custom">
+              <el-table-column prop="platform" label="Platform" min-width="150" sortable="custom">
                 <template #header>
                   <span class="browse-column-header">
                     <span>Platform</span>
@@ -163,7 +163,7 @@
                   </span>
                 </template>
               </el-table-column>
-              <el-table-column prop="sourceId" label="SourceID" min-width="125" sortable="custom">
+              <el-table-column prop="sourceId" label="SourceID" min-width="145" sortable="custom">
                 <template #header>
                   <span class="browse-column-header">
                     <span>SourceID</span>
@@ -174,7 +174,7 @@
                   </span>
                 </template>
               </el-table-column>
-              <el-table-column prop="disease" label="Disease" min-width="115" sortable="custom">
+              <el-table-column prop="disease" label="Disease" min-width="135" sortable="custom">
                 <template #header>
                   <span class="browse-column-header">
                     <span>Disease</span>
@@ -185,7 +185,7 @@
                   </span>
                 </template>
               </el-table-column>
-              <el-table-column prop="sampleSource" label="Sample Source" min-width="155" sortable="custom">
+              <el-table-column prop="sampleSource" label="Sample Source" min-width="180" sortable="custom">
                 <template #header>
                   <span class="browse-column-header">
                     <span>Sample Source</span>
@@ -237,42 +237,15 @@ import FacetCard from "@/components/FacetCard.vue";
 import { downloadCsv } from "@/utils/downloadCsv";
 
 const BROWSE_COLUMN_TOOLTIPS = {
-  datasetId: [
-    "Unique OSCAR identifier assigned to this sample.",
-    "Select the identifier to open the complete Sample Details page.",
-  ],
-  sampleType: [
-    "Biological material category recorded for the sample, such as tissue, cell line, sorted cells, organoid, or primary cells.",
-    "This describes the biosample type, not the sequencing platform.",
-  ],
-  tissue: [
-    "Organ or tissue associated with the sample in the imported metadata.",
-    "This value is also used by the Tissue Type filter on the left.",
-  ],
-  sampleName: [
-    "Descriptive sample name supplied by the source metadata.",
-    "It may include preparation, condition, donor, or replicate information.",
-  ],
-  cells: [
-    "Total number of cells reported for the sample in the imported metadata.",
-    "The value is formatted with thousands separators for display; sorting uses the numeric count.",
-  ],
-  platform: [
-    "Experimental or sequencing platform recorded for this sample.",
-    "It identifies the technology used to generate the sample data.",
-  ],
-  sourceId: [
-    "Source identifier or source label supplied in the original sample metadata.",
-    "It is separate from the OSCAR DatasetID and may identify a study, provider, or data collection.",
-  ],
-  disease: [
-    "Disease or condition status recorded for the sample.",
-    "Labels such as Control or Disease describe the source sample's reported condition.",
-  ],
-  sampleSource: [
-    "Original biological source label supplied for the sample.",
-    "It may repeat the Tissue value or provide a more specific source description.",
-  ],
+  datasetId: ["OSCAR sample identifier; select it to open Sample Details."],
+  sampleType: ["Biological material category, such as tissue, sorted cells, or organoid."],
+  tissue: ["Standardized organ or tissue assigned to the sample."],
+  sampleName: ["Sample name reported by the source dataset."],
+  cells: ["Number of cells retained for this sample."],
+  platform: ["Experimental platform used to generate the data."],
+  sourceId: ["Study or sample identifier used by the original data source."],
+  disease: ["Disease or control status recorded for the sample."],
+  sampleSource: ["Original anatomical or biological source label."],
 } as const;
 
 type ViewState = "loading" | "ready" | "error";
@@ -908,7 +881,7 @@ onMounted(() => {
 
 :deep(.tbl th.el-table__cell.is-sortable .caret-wrapper) {
   flex: 0 0 auto;
-  margin-left: 6px;
+  margin-left: 8px;
 }
 
 .browse-column-header {

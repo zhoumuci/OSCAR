@@ -5,6 +5,7 @@ import com.oscar.backend.entity.LinkedRegionRefreshResponse;
 import com.oscar.backend.mapper.RegulatoryAnnotationMaintenanceMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -97,6 +98,7 @@ public class RegulatoryAnnotationMaintenanceServiceImpl implements RegulatoryAnn
     }
 
     @Override
+    @CacheEvict(value = "contextOptions", allEntries = true)
     public LinkedRegionRefreshResponse refreshMarkerLinkedRegions(String datasetId, String domain) {
         String normalizedDatasetId = trimToNull(datasetId);
         String normalizedDomain = normalizeLinkedRegionDomain(domain);

@@ -48,6 +48,11 @@ public class SearchController {
         return searchService.listCellTypes();
     }
 
+    @GetMapping("/cell-type-tissues")
+    public List<Map<String, Object>> listTissuesByCellType(@RequestParam String cellType) {
+        return searchService.tissuesByCellType(cellType);
+    }
+
     @GetMapping("/tissue-counts")
     public List<Map<String, Object>> tissueCounts() {
         return searchService.tissueCounts();

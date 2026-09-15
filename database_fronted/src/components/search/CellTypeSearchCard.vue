@@ -7,7 +7,7 @@
       <div class="cte-card gsc-main-card">
         <span class="cte-field-label">Cell type query</span>
         <div class="gsc-celltype-picker">
-          <HelpTooltip text="Select one standardized cell-type annotation. The search returns OSCAR samples containing that cell type, optionally restricted to one tissue." label="Cell type query help" corner />
+          <HelpTooltip text="Select a standardized cell type to find samples containing it, with an optional tissue filter." label="Cell type query help" corner />
           <span class="gsc-celltype-picker-icon" aria-hidden="true">
             <span></span><span></span><span></span>
           </span>
@@ -38,21 +38,21 @@
           <span class="cte-hint">Choose one standardized cell type. Start typing to filter the available options.</span>
         </div>
         <div class="gsc-filter-row">
-          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Per page</span><HelpTooltip text="Controls how many matched samples are shown on each page. It does not limit the search or CSV download." label="Cell type results per page help" /></span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Per page</span><HelpTooltip text="Rows shown per page; searching and CSV download use all matches." label="Cell type results per page help" /></span>
             <el-select v-model="resultSize" class="cte-select" popper-class="oscar-select-popper" :disabled="loading">
               <el-option label="10" :value="10" /><el-option label="20" :value="20" /><el-option label="50" :value="50" />
             </el-select>
           </label>
-          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Tissue</span><HelpTooltip text="Optionally limits the selected cell-type search to samples from one tissue. Leaving it as All searches every tissue." label="Cell type tissue filter help" /></span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Tissue</span><HelpTooltip text="Restricts the selected cell type to tissues with matching samples." label="Cell type tissue filter help" /></span>
             <el-select
               v-model="selectedTissue"
               class="cte-select"
               popper-class="oscar-select-popper"
-              placeholder="All"
+              :placeholder="selectedCellType ? 'All matching tissues' : 'Select a cell type first'"
               filterable
               clearable
               :loading="tissueOptionsLoading"
-              :disabled="loading"
+              :disabled="loading || !selectedCellType || tissueOptionsLoading"
               @clear="selectedTissue = null"
             >
               <el-option v-for="option in tissueOptions" :key="option.name" :label="option.name" :value="option.name" />
@@ -91,7 +91,7 @@
           >
             <el-icon><Download /></el-icon>
           </button>
-          <div class="cte-card-title search-title-with-help"><span>TOP 12 Cell Types</span><HelpTooltip text="The 12 cell-type labels found in the largest number of OSCAR samples. Select a donut segment to run that cell-type search immediately." label="Top cell types chart help" /></div>
+          <div class="cte-card-title search-title-with-help"><span>TOP 12 Cell Types</span><HelpTooltip text="Twelve cell types ranked by the number of OSCAR samples containing them; select a segment to search." label="Top cell types chart help" /></div>
           <div ref="donutEl" class="gsc-donut"></div>
           <p class="gsc-donut-hint">Click a cell type to search it instantly.</p>
         </div>
@@ -105,7 +105,7 @@
         <div class="gsc-summary-card"><HelpTooltip text="Number of distinct OSCAR samples containing the selected cell type after the optional tissue filter is applied." label="Matched samples help" corner /><span class="gsc-sum-num">{{ results.matchedSamples }}</span><span class="gsc-sum-label">Matched samples</span></div>
       </div>
       <div class="gsc-res-head">
-        <span class="gsc-res-title search-title-with-help"><span>Associated samples</span><HelpTooltip text="One row per OSCAR sample containing the selected cell type. Pagination changes only the displayed rows." label="Cell type results help" /></span>
+        <span class="gsc-res-title search-title-with-help"><span>Associated samples</span><HelpTooltip text="One row per sample containing the selected cell type." label="Cell type results help" /></span>
         <button type="button" class="gsc-dl-btn" title="Download all results as CSV" @click="downloadTableCsv"><el-icon><Download /></el-icon><span>Download</span></button>
       </div>
       <div class="cte-table-wrap">
@@ -208,12 +208,10 @@ let donutChart: echarts.ECharts | null = null;
 async function renderDonut() {
   if (!donutEl.value) return;
   cellTypeOptionsLoading.value = true;
-  tissueOptionsLoading.value = true;
   try {
-    const [{ data: standardizedTypes }, { data: counts }, { data: tissueCounts }] = await Promise.all([
+    const [{ data: standardizedTypes }, { data: counts }] = await Promise.all([
       axios.get(buildApiUrl("api/search/cell-types")),
       axios.get(buildApiUrl("api/search/cell-type-counts")),
-      axios.get(buildApiUrl("api/search/tissue-counts")),
     ]);
     const countByType = new Map<string, number>(
       (Array.isArray(counts) ? counts : []).map((d: any) => [String(d.cellType || "").trim(), Number(d.cnt) || 0]),
@@ -222,10 +220,6 @@ async function renderDonut() {
       .map((name: any) => String(name || "").trim())
       .filter((name: string) => name)
       .map((name: string) => ({ name, count: countByType.get(name) || 0 }))
-      .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name));
-    tissueOptions.value = (Array.isArray(tissueCounts) ? tissueCounts : [])
-      .map((d: any) => ({ name: String(d.tissue || "").trim(), count: Number(d.cnt) || 0 }))
-      .filter((d: { name: string }) => d.name)
       .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name));
     if (!Array.isArray(counts) || !counts.length) return;
     const top = counts.slice(0, 12);
@@ -249,8 +243,44 @@ async function renderDonut() {
     });
     requestAnimationFrame(() => donutChart?.resize());
   } catch {}
-  finally { cellTypeOptionsLoading.value = false; tissueOptionsLoading.value = false; }
+  finally { cellTypeOptionsLoading.value = false; }
 }
+
+let tissueOptionsRequest = 0;
+async function loadTissuesForCellType(cellType: string) {
+  const requestId = ++tissueOptionsRequest;
+  const normalizedCellType = String(cellType || "").trim();
+  selectedTissue.value = null;
+  tissueOptions.value = [];
+
+  if (!normalizedCellType) {
+    tissueOptionsLoading.value = false;
+    return;
+  }
+
+  tissueOptionsLoading.value = true;
+  try {
+    const { data } = await axios.get(buildApiUrl("api/search/cell-type-tissues"), {
+      params: { cellType: normalizedCellType },
+    });
+    if (requestId !== tissueOptionsRequest) return;
+    tissueOptions.value = (Array.isArray(data) ? data : [])
+      .map((item: any) => ({
+        name: String(item.tissue || "").trim(),
+        count: Number(item.cnt) || 0,
+      }))
+      .filter((item: { name: string }) => item.name)
+      .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name));
+  } catch {
+    if (requestId === tissueOptionsRequest) {
+      ElMessage.error("Unable to load tissues for the selected cell type.");
+    }
+  } finally {
+    if (requestId === tissueOptionsRequest) tissueOptionsLoading.value = false;
+  }
+}
+
+watch(selectedCellType, loadTissuesForCellType);
 
 function disposeDonut() {
   donutChart?.dispose();

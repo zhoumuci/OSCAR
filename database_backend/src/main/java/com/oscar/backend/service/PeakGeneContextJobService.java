@@ -14,6 +14,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -22,6 +24,7 @@ public class PeakGeneContextJobService implements DisposableBean {
 
     private static final int MAX_QUEUED_JOBS = 16;
     private static final Duration FINISHED_JOB_TTL = Duration.ofMinutes(30);
+    private static final Duration CLEANUP_INTERVAL = Duration.ofMinutes(1);
 
     private final PeakGeneContextService analysisService;
     private final Map<String, JobState> jobs = new ConcurrentHashMap<>();
@@ -38,9 +41,21 @@ public class PeakGeneContextJobService implements DisposableBean {
             },
             new ThreadPoolExecutor.AbortPolicy()
     );
+    private final ScheduledExecutorService cleanupExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "peak-gene-context-job-cleaner");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     public PeakGeneContextJobService(PeakGeneContextService analysisService) {
         this.analysisService = analysisService;
+        long cleanupIntervalMillis = CLEANUP_INTERVAL.toMillis();
+        cleanupExecutor.scheduleAtFixedRate(
+                this::cleanupExpiredJobs,
+                cleanupIntervalMillis,
+                cleanupIntervalMillis,
+                TimeUnit.MILLISECONDS
+        );
     }
 
     public PeakGeneContextJobResponse submit(PeakGeneContextRequest request) {
@@ -69,6 +84,13 @@ public class PeakGeneContextJobService implements DisposableBean {
         return state.snapshot();
     }
 
+    public void releaseFinished(String jobId) {
+        JobState state = jobs.get(jobId);
+        if (state != null && state.isFinished()) {
+            jobs.remove(jobId, state);
+        }
+    }
+
     private void runJob(JobState state, PeakGeneContextRequest request) {
         state.start();
         try {
@@ -76,6 +98,8 @@ public class PeakGeneContextJobService implements DisposableBean {
             state.complete(result);
         } catch (Throwable error) {
             state.fail(errorMessage(error));
+        } finally {
+            cleanupExpiredJobs();
         }
     }
 
@@ -93,6 +117,7 @@ public class PeakGeneContextJobService implements DisposableBean {
 
     @Override
     public void destroy() {
+        cleanupExecutor.shutdownNow();
         executor.shutdownNow();
     }
 
@@ -146,6 +171,10 @@ public class PeakGeneContextJobService implements DisposableBean {
 
         private synchronized boolean isFinishedBefore(Instant cutoff) {
             return ("COMPLETED".equals(status) || "FAILED".equals(status)) && updatedAt.isBefore(cutoff);
+        }
+
+        private synchronized boolean isFinished() {
+            return "COMPLETED".equals(status) || "FAILED".equals(status);
         }
 
         private synchronized PeakGeneContextJobResponse snapshot() {

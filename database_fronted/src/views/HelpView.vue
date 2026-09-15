@@ -1,10 +1,10 @@
 <template>
   <div class="help-shell">
-    <aside class="help-sidebar">
+    <aside ref="helpSidebarRef" class="help-sidebar">
       <div class="help-toc-title">Contents</div>
       <nav class="help-toc" v-if="tocTree.length">
         <div v-for="section in tocTree" :key="section.id" class="toc-section">
-          <div class="toc-section-row" :class="{ active: activeId === section.id, 'parent-active': isParentActive(section) }">
+          <div :data-toc-id="section.id" class="toc-section-row" :class="{ active: activeId === section.id, 'parent-active': isParentActive(section) }">
             <button v-if="section.children.length" class="toc-toggle" type="button" @click.stop="toggleSection(section.id)">
               <span class="toc-toggle-icon" :class="{ expanded: expanded.has(section.id) }">›</span>
             </button>
@@ -12,7 +12,7 @@
             <a class="toc-section-link" :href="'#' + section.id" @click.prevent="scrollTo(section.id)">{{ section.text }}</a>
           </div>
           <div v-if="section.children.length" v-show="expanded.has(section.id)" class="toc-children">
-            <a v-for="child in section.children" :key="child.id" class="toc-child-link" :class="{ active: activeId === child.id }" :href="'#' + child.id" @click.prevent="scrollTo(child.id)">{{ child.text }}</a>
+            <a v-for="child in section.children" :key="child.id" :data-toc-id="child.id" class="toc-child-link" :class="{ active: activeId === child.id }" :href="'#' + child.id" @click.prevent="scrollTo(child.id)">{{ child.text }}</a>
           </div>
         </div>
       </nav>
@@ -27,13 +27,14 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 const loading = ref(true);
 const error = ref("");
 const renderedHtml = ref("");
 const activeId = ref("");
 const expanded = ref(new Set<string>());
+const helpSidebarRef = ref<HTMLElement | null>(null);
 const helpAssetVersion = Date.now().toString(36);
 
 interface TocChild { id: string; text: string }
@@ -45,6 +46,10 @@ function isParentActive(s: TocSection) {
 }
 
 function parseTocAndRender(md: string): string {
+  // Normalise line endings before block parsing. Mixed LF/CRLF content otherwise
+  // prevents blank lines and Markdown tables from being recognised consistently.
+  md = md.replace(/\r\n?/g, '\n');
+
   // Remove TOC heading if present
   md = md.replace(/^## Table of Contents\n\n[\s\S]*?\n(?=## )/m, '');
 
@@ -148,6 +153,31 @@ function onScroll() {
   if (best) activeId.value = best;
 }
 
+async function keepActiveTocItemVisible(id: string) {
+  if (!id) return;
+  await nextTick();
+  const sidebar = helpSidebarRef.value;
+  const target = sidebar?.querySelector<HTMLElement>(`[data-toc-id="${id}"]`);
+  if (!sidebar || !target) return;
+
+  const sidebarRect = sidebar.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const edgePadding = 14;
+  let nextScrollTop: number | null = null;
+
+  if (targetRect.top < sidebarRect.top + edgePadding) {
+    nextScrollTop = sidebar.scrollTop + targetRect.top - sidebarRect.top - edgePadding;
+  } else if (targetRect.bottom > sidebarRect.bottom - edgePadding) {
+    nextScrollTop = sidebar.scrollTop + targetRect.bottom - sidebarRect.bottom + edgePadding;
+  }
+
+  if (nextScrollTop !== null) {
+    sidebar.scrollTo({ top: Math.max(0, nextScrollTop), behavior: "smooth" });
+  }
+}
+
+watch(activeId, keepActiveTocItemVisible);
+
 let timer: any = null;
 let helpUnmounted = false;
 function onWindowScroll() {
@@ -166,6 +196,8 @@ onMounted(async () => {
     if (helpUnmounted) return;
     renderedHtml.value = parseTocAndRender(md);
     window.addEventListener("scroll", onWindowScroll, { passive: true });
+    await nextTick();
+    onScroll();
   } catch (e: any) {
     error.value = "Failed to load documentation. " + (e.message || "");
   } finally {

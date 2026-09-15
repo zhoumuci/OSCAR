@@ -245,7 +245,23 @@ public interface SearchMapper {
             </script>
             """)
     List<Map<String, Object>> findSamplesByCellType(@Param("cellType") String cellType,
-                                                     @Param("tissue") String tissue);
+                                                      @Param("tissue") String tissue);
+
+    @Select("""
+            SELECT s.tissue AS tissue,
+                   COUNT(DISTINCT ca.dataset_id) AS cnt
+            FROM oscar_cluster_annotation ca
+            JOIN oscar_sample s ON s.dataset_id = ca.dataset_id
+              AND (s.is_deleted IS NULL OR s.is_deleted = 0)
+              AND (s.is_visible IS NULL OR s.is_visible = 1)
+            WHERE ca.domain = 'integration'
+              AND ca.major_cell_type = #{cellType}
+              AND s.tissue IS NOT NULL
+              AND TRIM(s.tissue) <> ''
+            GROUP BY s.tissue
+            ORDER BY cnt DESC, s.tissue ASC
+            """)
+    List<Map<String, Object>> findTissuesByCellType(@Param("cellType") String cellType);
 
     @Select("""
             SELECT DISTINCT NULLIF(ca.major_cell_type, '') AS major_cell_type

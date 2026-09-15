@@ -7,7 +7,7 @@
       <div class="cte-card gsc-main-card">
         <span class="cte-field-label">Tissue query</span>
         <div class="gsc-tissue-picker">
-          <HelpTooltip text="Select one tissue to find every OSCAR sample annotated with that tissue. Start typing in the selector to filter the available tissue names." label="Tissue query help" corner />
+          <HelpTooltip text="Select a tissue to find OSCAR samples carrying that annotation." label="Tissue query help" corner />
           <span class="gsc-tissue-picker-icon" aria-hidden="true">
             <span></span><span></span><span></span>
           </span>
@@ -38,7 +38,7 @@
           <span class="cte-hint">Choose one tissue type. Start typing to filter the available options.</span>
         </div>
         <div class="gsc-filter-row">
-          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Per page</span><HelpTooltip text="Controls how many matched samples are shown on each page. It does not limit the search or CSV download." label="Tissue results per page help" /></span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Per page</span><HelpTooltip text="Rows shown per page; searching and CSV download use all matches." label="Tissue results per page help" /></span>
             <el-select v-model="resultSize" class="cte-select" popper-class="oscar-select-popper" :disabled="loading">
               <el-option label="10" :value="10" /><el-option label="20" :value="20" /><el-option label="50" :value="50" />
             </el-select>
@@ -78,7 +78,7 @@
           >
             <el-icon><Download /></el-icon>
           </button>
-          <div class="cte-card-title search-title-with-help"><span>TOP 12 Tissues</span><HelpTooltip text="The 12 tissues containing the largest numbers of OSCAR samples. Select a donut segment to run that tissue search immediately." label="Top tissues chart help" /></div>
+          <div class="cte-card-title search-title-with-help"><span>TOP 12 Tissues</span><HelpTooltip text="Twelve tissues ranked by OSCAR sample count; select a segment to search." label="Top tissues chart help" /></div>
           <div ref="donutEl" class="gsc-donut"></div>
           <p class="gsc-donut-hint">Click a tissue to search it instantly.</p>
         </div>
@@ -92,7 +92,7 @@
         <div class="gsc-summary-card"><HelpTooltip text="Number of distinct OSCAR samples annotated with the selected tissue." label="Matched samples help" corner /><span class="gsc-sum-num">{{ results.matchedSamples }}</span><span class="gsc-sum-label">Matched samples</span></div>
       </div>
       <div class="gsc-res-head">
-        <span class="gsc-res-title search-title-with-help"><span>Associated samples</span><HelpTooltip text="One row per OSCAR sample annotated with the selected tissue. Pagination changes only the displayed rows." label="Tissue results help" /></span>
+        <span class="gsc-res-title search-title-with-help"><span>Associated samples</span><HelpTooltip text="One row per sample annotated with the selected tissue." label="Tissue results help" /></span>
         <button type="button" class="gsc-dl-btn" title="Download all results as CSV" @click="downloadTableCsv">
           <el-icon><Download /></el-icon>
           <span>Download</span>

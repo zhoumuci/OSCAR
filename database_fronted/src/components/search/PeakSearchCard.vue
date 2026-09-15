@@ -14,7 +14,7 @@
           <span class="cte-field-label">Region query</span>
           <span class="search-max-help-wrap">
             <span class="cte-max-badge">MAX input: 200 regions</span>
-            <HelpTooltip text="Enter hg38 regions as chr:start-end or as BED-like chromosome, start, and end columns. Each valid line is searched independently, up to 200 regions." label="Region query help" corner />
+            <HelpTooltip text="Enter up to 200 hg38 regions as chr:start-end or BED coordinates." label="Region query help" corner />
           </span>
         </span>
         <textarea v-model="regionInput" class="cte-textarea" :class="{ 'cte-textarea--error': displayedInputError }" rows="3" placeholder="chr3:194136145-194138732" :disabled="loading" @input="onTextareaInput"></textarea>
@@ -37,7 +37,7 @@
             </button>
             <el-tooltip placement="top" effect="light" :show-after="200">
               <template #content>
-                <div><div>Accepted files: .bed, .txt, .csv, and .tsv.</div><div>Each row must contain chr:start-end or at least the first three BED columns: chromosome, start, and end.</div></div>
+                <div>Accepts .bed, .txt, .csv, or .tsv files containing chr:start-end or BED coordinates.</div>
               </template>
               <span class="spg-help-icon">?</span>
             </el-tooltip>
@@ -57,7 +57,7 @@
               <span class="cte-field-label">Match mode</span>
               <el-tooltip placement="top" effect="light" :show-after="200">
                 <template #content>
-                  <div><div><strong>Any input region:</strong> returns a sample when one or more submitted regions overlap a marker peak in that sample.</div><div><strong>All input regions:</strong> returns a sample only when every submitted region has at least one marker-peak overlap in that same sample.</div></div>
+                  <div>Any returns samples matching at least one input region; All requires every input region to match in the same sample.</div>
                 </template>
                 <span class="gsc-match-help">?</span>
               </el-tooltip>
@@ -66,12 +66,12 @@
               <el-option label="Any input region" value="any" /><el-option label="All input regions" value="all" />
             </el-select>
           </label>
-          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Per page</span><HelpTooltip text="Controls how many matched samples are shown on each table page. It does not limit the search or CSV download." label="Region results per page help" /></span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Per page</span><HelpTooltip text="Rows shown per page; searching and CSV download use all matches." label="Region results per page help" /></span>
             <el-select v-model="resultSize" class="cte-select" popper-class="oscar-select-popper" :disabled="loading">
               <el-option label="10" :value="10" /><el-option label="20" :value="20" /><el-option label="50" :value="50" />
             </el-select>
           </label>
-          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Domain</span><HelpTooltip text="Selects the OSCAR data domain in which overlapping marker peaks are searched. The current region-search workflow uses the integrated multi-omic domain." label="Region search domain help" /></span>
+          <label class="cte-field"><span class="cte-field-label-row"><span class="cte-field-label">Domain</span><HelpTooltip text="OSCAR domain searched for overlapping marker peaks; region search currently uses Integration." label="Region search domain help" /></span>
             <el-select v-model="domain" class="cte-select" popper-class="oscar-select-popper" :disabled="loading">
               <el-option label="Integration" value="integration" />
             </el-select>
@@ -105,7 +105,7 @@
 
     <div v-if="hasResults" class="gsc-results">
       <div class="gsc-summary-row">
-        <div class="gsc-summary-card"><HelpTooltip text="Number of OSCAR samples returned by the current region query. A Dataset ID restriction normally limits this to the selected sample." label="Matched samples help" corner /><span class="gsc-sum-num">{{ results.matchedSamples }}</span><span class="gsc-sum-label">Matched samples</span></div>
+        <div class="gsc-summary-card"><HelpTooltip text="Samples containing marker peaks that overlap the submitted regions." label="Matched samples help" corner /><span class="gsc-sum-num">{{ results.matchedSamples }}</span><span class="gsc-sum-label">Matched samples</span></div>
         <div class="gsc-summary-card"><HelpTooltip text="Number of submitted regions having at least one overlapping marker peak, shown over the total number of valid input regions." label="Matched input regions help" corner /><span class="gsc-sum-num">{{ results.matchedInputRegions }}/{{ results.inputRegions || '—' }}</span><span class="gsc-sum-label">Matched input regions</span></div>
         <div class="gsc-summary-card"><HelpTooltip text="Total distinct marker-peak overlaps found for the submitted regions in the returned samples." label="Overlapping peaks help" corner /><span class="gsc-sum-num">{{ results.overlappingPeaks.toLocaleString() }}</span><span class="gsc-sum-label">Overlapping peaks</span></div>
         <div class="gsc-summary-card"><HelpTooltip text="Number of marker genes linked to the overlapping peaks through OSCAR peak-to-gene evidence." label="Linked marker genes help" corner /><span class="gsc-sum-num">{{ results.linkedGenes }}</span><span class="gsc-sum-label">Linked marker genes</span></div>
