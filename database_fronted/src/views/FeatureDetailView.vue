@@ -384,12 +384,12 @@ const overviewSubtitle = computed(() => isPeakDetail.value
   : "Marker gene occurrence landscape across OSCAR datasets and cell types.");
 
 const topDatasetsHelp = computed(() => isPeakDetail.value
-  ? "For the displayed peak, marker-peak records with the same chromosome, start, and end coordinates are counted in each dataset across all cell types and clusters. Datasets are ranked by record count from highest to lowest; Dataset ID breaks ties, and the first 10 are shown. This chart highlights the datasets in which this peak is most frequently reported as a marker, helping users identify samples for follow-up. It does not rank chromatin accessibility, effect size, or statistical significance."
-  : "For the displayed gene, marker-gene record counts are summed in each dataset across all cell types and clusters. Datasets are ranked by the summed record count from highest to lowest; Dataset ID breaks ties, and the first 10 are shown. This chart highlights the datasets in which this gene is most frequently reported as a marker, helping users identify samples for follow-up. It does not rank gene expression, effect size, or statistical significance.");
+  ? "Counts how often this exact peak appears as a marker in each dataset and shows the 10 highest counts. This shows which datasets report the peak most often, not where accessibility is highest."
+  : "Adds up this gene's marker records in each dataset and shows the 10 highest counts. This shows which datasets report the gene most often, not where expression is highest.");
 
 const topCellTypesHelp = computed(() => isPeakDetail.value
-  ? "For the displayed peak, marker-peak records with the same chromosome, start, and end coordinates are grouped by standardized major cell type across all datasets and clusters, then counted. Cell types are ranked by record count from highest to lowest; cell-type name breaks ties, and the first 10 are shown. ‘Unknown’ means that no major cell type was mapped. This chart shows the cell types in which the peak is most frequently reported as a marker, not its accessibility level, effect size, or statistical significance."
-  : "For the displayed gene, marker-gene record counts are summed by standardized major cell type across all datasets and clusters. Cell types are ranked by the summed record count from highest to lowest; cell-type name breaks ties, and the first 10 are shown. ‘Unknown’ means that no major cell type was mapped. This chart shows the cell types in which the gene is most frequently reported as a marker, not its expression level, effect size, or statistical significance.");
+  ? "Counts this exact peak's marker records for each major cell type and shows the 10 highest counts. This shows which cell types report the peak most often."
+  : "Adds up this gene's marker records for each major cell type and shows the 10 highest counts. This shows which cell types report the gene most often.");
 
 /* ---- Overview data ---- */
 const occurrenceLoading = ref(false);

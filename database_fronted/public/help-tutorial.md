@@ -6,7 +6,7 @@ OSCAR is a human single-cell multi-omics regulatory database. This guide describ
 
 ## 1. Overview
 
-OSCAR provides five connected workflows:
+OSCAR provides six connected workflows:
 
 - Search samples by marker gene, genomic region, tissue, or standardized cell type.
 - Browse all samples using metadata filters and keyword search.
@@ -45,7 +45,9 @@ Two P2G views are available where applicable:
 - **P2G links (all)** returns stored P2G links without requiring marker status at both ends.
 - **P2G links (marker)** keeps links for which the peak is a marker peak and the gene is a marker gene in the matching sample data.
 
-Where available, **ABC support** reports whether a stored link is supported by Activity-by-Contact evidence. A blue point means supported, a gray point means evaluated but not supported, and a dash means that no ABC evaluation is stored for that row. Downloads retain the database representation: `1` for supported, `0` for evaluated but not supported, and an empty value when unavailable.
+Where available, **ABC support** indicates whether Activity-by-Contact evidence supports a stored link. A blue point means supported and a gray point means evaluated but unsupported. Downloads use `1` for supported and `0` for evaluated but unsupported.
+
+For ArchR-derived P2G links, **Correlation** measures the association between peak accessibility and linked-gene expression, and its sign gives the direction. **Link score** is the absolute correlation, so larger values indicate a stronger association regardless of direction. **FDR** is the multiple-testing adjusted significance of that correlation. **VarQ ATAC** and **VarQ RNA** are variance quantiles for peak accessibility and gene expression; higher values indicate greater variation across cells and are not P values.
 
 ### 2.4 Reference regulatory annotations
 
@@ -75,7 +77,7 @@ Gene Search finds samples in which at least one submitted gene occurs as the sel
 **How to run the search:**
 
 1. Paste gene symbols or upload a supported file.
-2. Check the Input genes, Valid genes, Duplicate genes, and Invalid tokens counters.
+2. Check the Input genes, Valid genes, and Invalid tokens counters. Input genes counts parsed tokens, while Valid genes counts unique symbols that pass validation; duplicates are removed from the submitted list.
 3. Choose the marker signal type and, if needed, one tissue.
 4. Choose the initial sort field and page size, then select **Search**.
 5. Use the column headers to change the global order of the returned rows, or download the complete result as CSV.
@@ -87,7 +89,7 @@ Gene Search finds samples in which at least one submitted gene occurs as the sel
 - Upload formats: **`.txt`, `.csv`, `.tsv`**.
 - CSV and TSV files may contain a recognized gene column such as `gene`, `gene_symbol`, `symbol`, `gene_name`, `hgnc_symbol`, or `marker_gene`.
 - Gene symbols are converted to uppercase and duplicate symbols are removed.
-- Invalid tokens and unsupported files are reported before Search can run. More than 200 unique genes disables the Search button; the list is never silently truncated.
+- Invalid tokens are reported and excluded from the submitted list. More than 200 parsed gene entries disables the Search button; the list is never silently truncated.
 
 **Parameters:**
 
@@ -228,6 +230,7 @@ The Browse page lists OSCAR samples in a server-paginated table.
 - Use the keyword box to search the available sample metadata.
 - Sort supported columns from the table header.
 - Click a Dataset ID to open Sample Details.
+- Select **CSV** to download every sample in the current filtered and sorted result, not only the visible page.
 
 The Sample Details return button leads back to Browse when the sample was opened from this page.
 
@@ -264,6 +267,7 @@ The regulatory annotation module provides the data types available for the selec
 - Gene and peak detail buttons are shown only when the row contains sufficient identifiers or genomic coordinates.
 - P2G marker rows represent links with marker support at both the peak and gene ends.
 - In P2G tables, **Gene marker type** indicates expression-marker or gene-score-marker evidence. The following **ABC support** column shows independent Activity-by-Contact support and must not be interpreted as the gene marker type itself.
+- The **All P2G links** table uses the ArchR Correlation, Link score, FDR, VarQ RNA, and VarQ ATAC meanings defined in Section 2.3.
 - Full downloads are prepared by the download endpoint and do not depend on the current visible table page.
 
 During a long download, the annotation module is locked and displays progress feedback. The main navigation remains usable. If the user leaves and later returns to the same Sample Details page while the download is still running, the download state remains visible.
@@ -274,7 +278,7 @@ During a long download, the annotation module is locked and displays progress fe
 
 ### 6.4 Regulatory network
 
-The Integration view can display a Peak-to-Gene regulatory network. Network controls, filters, and downloads apply to the current sample and domain.
+The Integration view can display a Peak-to-Gene regulatory network. Network controls, filters, and downloads apply to the current sample and domain. **Graph visible links** contains exactly the links currently drawn: search, focus, and expansion can change that set, while table pagination does not. Its CSV download includes every currently visible link.
 
 ## 7. Gene Details and Peak Details
 
@@ -293,11 +297,11 @@ The Overview module summarizes how often the selected gene or exact peak interva
 
 | Summary | How it is calculated | What users can learn |
 |---------|----------------------|----------------------|
-| Top 10 datasets for a gene | Marker-record counts are aggregated for the gene across cell types and clusters within each dataset, then ordered by count. | Identifies datasets in which the gene is most frequently represented in stored marker contexts. It does not mean the gene has the highest expression in that dataset. |
-| Top 10 datasets for a peak | Marker-peak records matching the exact displayed hg38 interval are counted across contexts within each dataset, then ordered by count. | Identifies datasets in which that exact peak is most repeatedly observed as a marker peak. |
-| Top 10 cell types | Marker-record counts are aggregated across datasets and clusters for each mapped major cell type, then ordered by count. | Shows the cell-type contexts contributing the greatest number of stored marker records. `Unknown` means that no major cell type mapping is available. |
+| Top 10 datasets for a gene | Adds up the gene's marker records within each dataset and ranks datasets by count. | Shows which datasets report the gene most often as a marker, not where expression is highest. |
+| Top 10 datasets for a peak | Counts marker records for the exact displayed hg38 interval within each dataset and ranks datasets by count. | Shows which datasets report the peak most often, not where accessibility is highest. |
+| Top 10 cell types | Adds up the gene's or exact peak's marker records for each mapped major cell type and ranks cell types by count. | Shows which cell types report the marker most often. `Unknown` means no major cell type was mapped. |
 
-Rankings use descending marker-record count with deterministic alphabetical tie-breaking and display at most 10 groups. Gene Details additionally shows available expression profiles by platform. These overview queries begin when the details page opens.
+The first 10 groups are shown; ties are ordered alphabetically. Gene Details also shows available expression profiles by platform.
 
 ![Gene Details overview](../assets/help/gene-detail-header.png)
 
@@ -335,7 +339,7 @@ Gene regulatory-annotation filenames distinguish the gene, selected gene-region 
 
 ## 8. Analysis
 
-The Analysis page contains three independent modules. Each module validates input before submission, reports progress, preserves its completed result while the user inspects detail pages, and provides downloads for the current result type. Parameters labelled as page size affect display only; parameters labelled **Maximum returned records** can make an analysis result incomplete by design.
+The Analysis page contains three independent modules. Each module validates input before submission, reports progress, keeps its completed result in the current browser view while the user inspects detail pages, and provides downloads for the current result type. Once the browser receives a completed asynchronous result, the server-side job result is released; a timed cleanup removes any completed result that was never acknowledged. Parameters labelled as page size affect display only; parameters labelled **Maximum returned records** can make an analysis result incomplete by design.
 
 ### 8.1 Cell Enrichment Analysis
 
@@ -476,7 +480,7 @@ The mapping status summarizes how confidently the application can choose a locus
 | Result table | Columns and interpretation |
 |--------------|----------------------------|
 | All overlapping peaks | Dataset; Peak region in hg38; Source indicating P2G, Marker, or Both; Linked genes; FDR from the strongest available link; Link score from the strongest available link. Peaks with the same coordinates are merged in this overview. |
-| P2G links | Dataset; Peak region; Linked gene; peak-gene Correlation; link FDR; Link score. A marker badge identifies a peak also found in marker-peak evidence. |
+| P2G links | Dataset; Peak region; Linked gene; ArchR peak-accessibility/gene-expression Correlation; link FDR; absolute-correlation Link score. A marker badge identifies a peak also found in marker-peak evidence. |
 | Marker peaks | Dataset; marker-analysis Domain; Cluster; Peak region; Linked genes when available; best linked P2G FDR; best linked P2G Link score. |
 
 Each result tab displays 10 rows per page and downloads all rows belonging to that tab as CSV. If **Maximum returned records** was used, the download contains the capped evidence result and the interface displays a truncation warning.
@@ -545,8 +549,8 @@ This analysis intersects an input peak set with stored P2G peak intervals and th
 | Gene | Submitted gene linked to the matched peak. Marker badges distinguish expression and gene-score marker evidence. |
 | Cell type | Cell type or cluster supporting the marker-context record; shown only for Cell type results. |
 | Dataset | OSCAR sample containing the result. |
-| Link score | Strength score stored for the P2G association. Larger values represent stronger score evidence within the underlying method but are not proof of causality. |
-| Link FDR | Multiple-testing adjusted significance stored for the P2G association. Smaller values indicate stronger statistical evidence. |
+| Link score | Absolute ArchR peak–gene correlation. Larger values indicate a stronger association regardless of direction but are not proof of causality. |
+| Link FDR | ArchR false discovery rate for the peak–gene correlation. Smaller values indicate stronger statistical evidence. |
 
 General results provide Table and Peak-Gene network tabs. Cell-type results additionally provide a Cell type chart and Bubble heatmap. Table sorting is applied before the fixed 10-row pagination. The table CSV includes all returned rows and also records Peak name, Marker peak status, and Gene marker types.
 
@@ -595,7 +599,7 @@ The cart applies one chosen domain, data type, and format to every selected samp
 4. The progress area shows the current sample, batch, and failures. Select **Pause** to stop safely; Resume restarts the unfinished file from the beginning.
 5. The next batch starts automatically after the preceding batch; no manual reconnection is required.
 
-The browser saves the queue in session storage. After a pause or refresh, **Resume** puts failed and unfinished samples back in their original order, starting with the first incomplete file. Successful files are not requested again. **Retry failed** is available when only failed items remain, and **Discard** removes the saved queue. This is a browser checkpoint, not a server-side download job.
+The browser saves the queue in session storage. After a pause or refresh, **Resume** puts failed and unfinished samples back in their original order, starting with the first incomplete file. Successful files are not requested again. **Retry failed** is available when only failed items remain, and **Discard** removes the saved queue, clears the selection, and returns the cart to its initial empty state. This is a browser checkpoint, not a server-side download job.
 
 ### 9.4 File formats and P2G fields
 
@@ -606,7 +610,7 @@ The browser saves the queue in session storage. After a pause or refresh, **Resu
 | P2G links with marker support | TSV or CSV | P2G records whose peak and gene have the required marker context. |
 | All P2G links | TSV or CSV | Stored P2G records without requiring marker status at both ends. |
 
-P2G downloads include **ABC support** when that field is available. The exported value is the database value: `1` means ABC supported, `0` means evaluated but not ABC supported, and an empty value means no stored evaluation. The download does not replace these values with display labels such as “Supported”.
+All P2G downloads retain the ArchR **Link score**, **Correlation**, and **Link FDR** fields described above; the all-links file also retains **VarQ RNA** and **VarQ ATAC**. When **ABC support** is present, `1` means supported and `0` means evaluated but unsupported. Downloads keep these numeric values instead of replacing them with display labels.
 
 TSV is convenient for command-line and statistical workflows because tabs do not conflict with commas inside text fields. CSV is convenient for spreadsheet software. Both formats represent the same selected file type; changing the format does not change the biological filtering.
 
@@ -692,7 +696,7 @@ Return to the Download cart in the same browser session and select **Resume**. I
 
 ### Why do ABC support values appear as 0 and 1 in a download?
 
-The interface uses coloured points for quick reading, but downloads preserve the stored field: `1` is ABC supported, `0` is evaluated but not supported, and an empty value means no ABC evaluation is available.
+The interface uses coloured points for quick reading, while downloads keep the stored values: `1` means supported and `0` means evaluated but unsupported.
 
 ### What happens when I open a details page?
 
@@ -713,4 +717,4 @@ If OSCAR supports your research, cite the OSCAR manuscript using the citation sh
 OSCAR is designed to be responsive and supports browsing and analysis on mobile phones and tablets.
 
 > **Document version:** 1.1
-> **Last updated:** 2026-09-14
+> **Last updated:** 2026-09-15

@@ -240,10 +240,10 @@
               >
                 <template #content>
                   <div v-if="column.kind === 'signal-type'">
-                    Gene expression marks RNA-derived values; gene activity score marks accessibility-derived values.
+                    Gene expression is RNA-derived; gene score is derived from ATAC-based gene activity.
                   </div>
                   <div v-else-if="column.kind === 'abc-support'">
-                    ABC support for the link: blue is supported, gray is evaluated but unsupported, and a dash is not evaluated.
+                    Activity-by-Contact support for this link: blue means supported and gray means evaluated but unsupported.
                   </div>
                   <div v-else><div v-for="line in column.headerTooltip" :key="line">{{ line }}</div></div>
                 </template>
@@ -561,7 +561,7 @@ const annotationTabConfig: Record<RegulatoryAnnotationType, AnnotationTabConfig>
   marker_gene: {
     value: "marker_gene",
     label: "Marker genes",
-    description: "Cell type-associated marker genes with expression-level statistics.",
+    description: "Cell type-associated marker genes with signal-level statistics.",
   },
   marker_peak: {
     value: "marker_peak",
@@ -592,10 +592,10 @@ const COLUMN_TOOLTIPS = {
   p2gLinkedPeak: ["hg38 interval at the peak end of the stored peak-to-gene link."],
   p2gMarkerGene: ["Linked gene with marker-gene support in the same sample and cell type or cluster."],
   p2gMarkerPeak: ["Linked peak with marker-peak support in the same sample and cell type or cluster."],
-  p2gScore: ["Score assigned to the stored peak-to-gene link; larger values indicate stronger linkage."],
+  p2gScore: ["Absolute ArchR peak–gene correlation stored as the link score; larger values indicate a stronger association regardless of direction."],
   p2gGeneEvidence: ["Log2FC and FDR for marker-gene support at the gene end of this link."],
   p2gPeakEvidence: ["Log2FC and FDR for marker-peak support at the peak end of this link."],
-  p2gAbcSupport: ["ABC support for the link: blue is supported, gray is evaluated but unsupported, and a dash is not evaluated."],
+  p2gAbcSupport: ["Activity-by-Contact support for this link: blue means supported and gray means evaluated but unsupported."],
   p2gSample: ["Dataset, sample name, and assay supplying this peak-to-gene link."],
   tf: ["Transcription-factor annotation; blank when no value is available."],
 } as const;
@@ -733,6 +733,11 @@ const sectionDescription = computed(() => {
     return p2gMode.value === "marker"
       ? "P2G links whose gene end and peak end are both OSCAR markers in the same sample and cell type or cluster."
       : "All stored peak-to-gene links for this sample, without requiring marker support at either end.";
+  }
+  if (activeAnnotationType.value === "marker_gene" && props.domain === "integration") {
+    return markerGeneSubtype.value === "gene_score"
+      ? "Cell type-associated gene score markers derived from ATAC-based gene activity."
+      : "Cell type-associated gene expression markers derived from RNA expression.";
   }
   return domainDescriptions[props.domain]?.[activeAnnotationType.value]
       ?? activeAnnotationConfig.value.description;
@@ -978,7 +983,7 @@ function getActiveColumns(annotationType: RegulatoryAnnotationType): AnnotationC
           kind: "metric",
           minWidth: 100,
           align: "center",
-          headerTooltip: ["P-value for the stored peak-to-gene link after correction for multiple tests.", "A smaller value means the link is less likely to be due to chance."],
+          headerTooltip: ["ArchR false discovery rate for the peak–gene correlation; smaller values indicate stronger statistical evidence."],
         },
         {
           key: "varQrna",
@@ -986,7 +991,7 @@ function getActiveColumns(annotationType: RegulatoryAnnotationType): AnnotationC
           kind: "metric",
           minWidth: 110,
           align: "center",
-          headerTooltip: ["Corrected variance value for the RNA part of the P2G calculation.", "A smaller value indicates stronger support from RNA variation."],
+          headerTooltip: ["ArchR variance quantile for linked-gene expression; higher values mean the gene is more variable across cells."],
         },
         {
           key: "varQatac",
@@ -994,7 +999,7 @@ function getActiveColumns(annotationType: RegulatoryAnnotationType): AnnotationC
           kind: "metric",
           minWidth: 110,
           align: "center",
-          headerTooltip: ["Corrected variance value for the ATAC part of the P2G calculation.", "A smaller value indicates stronger support from accessibility variation."],
+          headerTooltip: ["ArchR variance quantile for peak accessibility; higher values mean the peak is more variable across cells."],
         },
         {
           key: "abcSupport",
@@ -1059,7 +1064,7 @@ function getActiveColumns(annotationType: RegulatoryAnnotationType): AnnotationC
         kind: "signal-type",
         minWidth: 120,
         align: "center",
-        headerTooltip: ["Shows which marker-gene measurement supplied the gene values in this row.", "Gene expression uses RNA values; gene activity score uses ATAC-derived gene activity values."],
+        headerTooltip: ["Marker-gene evidence used for this row: gene expression is RNA-derived, while gene score is derived from ATAC-based gene activity."],
       },
       {
         key: "abcSupport",

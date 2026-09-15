@@ -13,7 +13,7 @@
               <span class="cte-max-help-wrap">
                 <span class="cte-max-badge">MAX input: 200 genes</span>
                 <el-tooltip placement="top" effect="light" :show-after="200">
-                  <template #content><div class="cte-result-level-help">Enter human gene symbols separated by line breaks, commas, or spaces. Symbols are normalised to uppercase, duplicates are removed, and at most 200 genes are accepted.</div></template>
+                  <template #content><div class="cte-result-level-help">Enter up to 200 human gene entries separated by line breaks, commas, or spaces. Valid symbols are normalised to uppercase and duplicates are removed.</div></template>
                   <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Gene set input help">?</span>
                 </el-tooltip>
               </span>
@@ -87,7 +87,7 @@ CCR7"
         <div class="stat-item stat-item--muted">
           <span class="stat-label">Input genes</span>
             <el-tooltip placement="top" effect="light" :show-after="200">
-              <template #content><div class="cte-result-level-help">Number of unique valid gene symbols in the input.</div></template>
+              <template #content><div class="cte-result-level-help">Number of gene tokens found before invalid entries and duplicates are removed.</div></template>
               <span class="cte-card-help-icon" role="button" tabindex="0" aria-label="Input genes help">?</span>
             </el-tooltip>
           <span class="stat-value">{{ inputGeneCount }}</span>

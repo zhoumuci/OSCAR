@@ -7,7 +7,7 @@
       <span class="cte-field-label">Gene query</span>
       <span class="search-max-help-wrap">
         <span class="cte-max-badge">MAX input: 200 genes</span>
-        <HelpTooltip text="Enter up to 200 human gene symbols; separators are flexible and duplicates are removed." label="Gene query help" corner />
+        <HelpTooltip text="Enter up to 200 human gene entries; valid symbols are converted to uppercase and duplicates are removed." label="Gene query help" corner />
       </span>
     </span>
 
@@ -47,8 +47,8 @@
         </div>
         <input ref="fileInputRef" type="file" accept=".txt,.csv,.tsv" style="display:none" @change="onFileSelected" />
         <div v-if="geneInput.trim()" class="gsc-stat-row">
-          <div class="gsc-stat gsc-stat--muted"><HelpTooltip text="Number of unique input tokens found after splitting the text and removing duplicates." label="Input genes help" corner /><span class="gsc-stat-num">{{ geneStats.total }}</span><span class="gsc-stat-label">Input genes</span></div>
-          <div class="gsc-stat"><HelpTooltip text="Number of input tokens that pass gene-symbol validation and can be submitted to the search." label="Valid genes help" corner /><span class="gsc-stat-num">{{ geneStats.valid }}</span><span class="gsc-stat-label">Valid genes</span></div>
+          <div class="gsc-stat gsc-stat--muted"><HelpTooltip text="Number of gene tokens found before invalid entries and duplicates are removed." label="Input genes help" corner /><span class="gsc-stat-num">{{ geneStats.total }}</span><span class="gsc-stat-label">Input genes</span></div>
+          <div class="gsc-stat"><HelpTooltip text="Number of unique gene symbols that pass validation and can be submitted." label="Valid genes help" corner /><span class="gsc-stat-num">{{ geneStats.valid }}</span><span class="gsc-stat-label">Valid genes</span></div>
           <div class="gsc-stat" :class="{ 'gsc-stat--bad': geneStats.invalid > 0 }"><HelpTooltip text="Number of tokens rejected because they do not match the accepted human gene-symbol format." label="Invalid tokens help" corner /><span class="gsc-stat-num">{{ geneStats.invalid }}</span><span class="gsc-stat-label">Invalid tokens</span></div>
           <div v-if="geneLimitExceeded" class="gsc-stat gsc-stat--warn"><span class="gsc-stat-num">!</span><span class="gsc-stat-label">Max 200 exceeded</span></div>
         </div>

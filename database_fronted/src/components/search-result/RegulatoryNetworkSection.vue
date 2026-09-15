@@ -806,7 +806,7 @@ const NETWORK_COLUMN_TOOLTIPS = {
     "Peak-to-TSS distance in base pairs when available; a dash means the source did not provide it.",
   ],
   linkScore: [
-    "Stored score for this P2G link; higher values indicate stronger linkage.",
+    "Absolute ArchR peak–gene correlation stored as the link score; higher values indicate a stronger association regardless of direction.",
   ],
   correlation: [
     "ArchR correlation between peak accessibility and gene expression; the sign gives the direction.",
